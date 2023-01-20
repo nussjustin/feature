@@ -1,0 +1,27 @@
+linters:
+  enable-all: true
+  disable:
+    - deadcode
+    - exhaustivestruct
+    - exhaustruct
+    - gochecknoglobals
+    - godox
+    - golint
+    - ifshort
+    - interfacer
+    - ireturn # reports generic types as interfaces
+    - lll
+    - maligned
+    - nlreturn
+    - nonamedreturns
+    - nosnakecase
+    - predeclared
+    - scopelint
+    - structcheck
+    - varcheck
+    - varnamelen
+    - wrapcheck
+    - wsl
+run:
+  skip-files:
+    - _test.go$
