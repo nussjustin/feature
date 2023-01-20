@@ -5,6 +5,21 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+)
+
+const (
+	tracerName = "github.com/nussjustin/feature"
+)
+
+var (
+	attributeFeatureEnabled  = attribute.Key("feature.enabled")
+	attributeFeatureName     = attribute.Key("feature.name")
+	attributeExperimentPanic = attribute.Key("feature.experiment.panic")
 )
 
 // Decision is an enum of the potential decisions a [Strategy] can make on whether a [Flag] should be enabled or not.
@@ -57,6 +72,7 @@ const (
 // The zero value is usable as is, using the default decision for each flag.
 type Set struct {
 	strategy atomic.Pointer[Strategy]
+	tracer   atomic.Pointer[trace.Tracer]
 
 	mu    sync.Mutex
 	flags map[string]*Flag
@@ -80,6 +96,35 @@ func (s *Set) SetStrategy(strategy Strategy) {
 	}
 }
 
+// SetTracerProvider sets the provider used for creating a tracer for the global [Set].
+//
+// See [Set.SetTracerProvider] for more information.
+func SetTracerProvider(tp trace.TracerProvider) {
+	globalSet.SetTracerProvider(tp)
+}
+
+// SetTracerProvider sets the provider used for creating a tracer.
+func (s *Set) SetTracerProvider(tp trace.TracerProvider) {
+	t := tp.Tracer(tracerName)
+
+	s.tracer.Store(&t)
+}
+
+func (s *Set) getTracer() trace.Tracer {
+	ptr := s.tracer.Load()
+
+	if ptr != nil {
+		return *ptr
+	}
+
+	tracer := otel.GetTracerProvider().Tracer(tracerName)
+
+	// No need for CAW since the tracer is always the same
+	s.tracer.Store(&tracer)
+
+	return tracer
+}
+
 func (s *Set) newFlag(name, description string, defaultDecision DefaultDecision) *Flag {
 	f := &Flag{set: s, name: name, description: description, defaultDecision: defaultDecision}
 
@@ -101,10 +146,12 @@ func (s *Set) newFlag(name, description string, defaultDecision DefaultDecision)
 
 // Case can be used to simplify running code paths dynamically based on the whether a feature is enabled.
 //
-// Additionally, _experiments_ can be run using the [Case.Experiment] method, which can compare the results of two
-// functions, most commonly a new and a old implementation of some logic, while assuring that problems in one
-// function (the _new_ implementation) do not cause problems by falling back to the result of the other function
-// in case of an error or some other unexpected differences.
+// Additionally, _experiments_ can be run using the [Case.Experiment] method, which compare the results of two
+// functions, while safely returning the correct value based on the status of the feature.
+//
+// Functions executed via [Case.Run] and experiments run via [Case.Experiment] are traced using spans created
+// via the tracer obtained from the [otel.TracerProvider] set using the [Set.SetTracerProvider] method (or the
+// global [SetTracerProvider] function, if using the global [Set]).
 //
 // A Case must be obtained using either [CaseFor], [NewCase] or [RegisterCase]. The zero value is invalid.
 type Case[T any] struct {
@@ -137,6 +184,10 @@ func Equals[T comparable](a, b T) bool {
 	return a == b
 }
 
+func (c *Case[T]) startSpan(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+	return c.flag.set.getTracer().Start(ctx, spanName, opts...)
+}
+
 // PanicError is used to wrap the values of recovered panics in [Case.Experiment].
 type PanicError struct {
 	name string
@@ -152,20 +203,36 @@ func (p *PanicError) Error() string {
 	return fmt.Sprintf("%s: caught panic(%v)", p.name, p.Value)
 }
 
-func catchPanic[T any](name string, f func() (T, error)) (t T, paniced bool, err error) {
+func (c *Case[T]) run(ctx context.Context, name string, f func(context.Context) (T, error)) (t T, err error) {
+	ctx, span := c.startSpan(ctx, name, trace.WithSpanKind(trace.SpanKindInternal))
+	defer span.End()
+
 	defer func() {
+		var panicked bool
+
 		if v := recover(); v != nil {
-			paniced = true
+			panicked = true
 			err = &PanicError{name: name, Value: v}
 		}
+
+		span.SetAttributes(attributeExperimentPanic.Bool(panicked))
+
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		} else {
+			span.SetStatus(codes.Ok, "")
+		}
 	}()
-	t, err = f()
+
+	t, err = f(ctx)
 	return
 }
 
-// Experiment runs new and old concurrently and compares their results using cmp.
+// Experiment runs both an experimental and a control function concurrently and compares their results using equals.
 //
-// If the feature flag is enabled, the result from new will be returned, otherwise the result from old will be returned.
+// If the feature flag is enabled, the result of the experimental function will be returned, otherwise the result of the
+// control function will be returned.
 //
 // When a function panics the panic is caught and converted into an error that is or wraps a [PanicError] and treated
 // like a normal error.
@@ -177,50 +244,59 @@ func catchPanic[T any](name string, f func() (T, error)) (t T, paniced bool, err
 //
 //	c.Experiment(ctx, newFunc, oldFunc, feature.Equals[User])
 func (c *Case[T]) Experiment(ctx context.Context,
-	new func(context.Context) (T, error),
-	old func(context.Context) (T, error),
+	experimental func(context.Context) (T, error),
+	control func(context.Context) (T, error),
 	equals func(new, old T) bool,
 ) (T, error) {
-	// TODO: tracing
-	// TODO: timing metrics
+	ctx, span := c.startSpan(ctx, "Experiment", trace.WithSpanKind(trace.SpanKindInternal))
+	defer span.End()
+
+	// Check status before while the experiment runs. This can save some time if the used Strategy is slow.
+	isEnabled := c.flag.Enabled(ctx)
+
+	span.SetAttributes(
+		attributeFeatureEnabled.Bool(isEnabled),
+		attributeFeatureName.String(c.flag.name))
+
 	var wg sync.WaitGroup
 	var (
-		newT   T
-		newErr error
+		experimentT   T
+		experimentErr error
 
-		oldT   T
-		oldErr error
+		controlT   T
+		controlErr error
 	)
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		newT, _, newErr = catchPanic("new", func() (T, error) { return new(ctx) })
+		experimentT, experimentErr = c.run(ctx, "Experimental", experimental)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		oldT, _, oldErr = catchPanic("old", func() (T, error) { return old(ctx) })
+		controlT, controlErr = c.run(ctx, "Control", control)
 	}()
-
-	// Check status before while the experiment runs. This can save some time if the used Strategy is slow.
-	isEnabled := c.flag.Enabled(ctx)
 
 	wg.Wait()
 
-	// TODO: error metrics
-	// TODO: panic metrics
-	// TODO: difference metrics
-	// TODO: status metrics
-
-	_ = equals(newT, oldT)
-
-	if isEnabled {
-		return newT, newErr
+	switch {
+	case experimentErr != nil:
+		span.SetStatus(codes.Error, "experiment failed")
+	case controlErr != nil:
+		span.SetStatus(codes.Error, "control failed")
+	case !equals(experimentT, controlT):
+		span.SetStatus(codes.Error, "experimental result does not match control value")
+	default:
+		span.SetStatus(codes.Ok, "")
 	}
 
-	return oldT, oldErr
+	if isEnabled {
+		return experimentT, experimentErr
+	}
+
+	return controlT, controlErr
 }
 
 // Run checks if the associated flag is enabled and runs either ifEnabled or ifDisabled and returns their result.
@@ -232,11 +308,33 @@ func (c *Case[T]) Run(ctx context.Context,
 	ifEnabled func(context.Context) (T, error),
 	ifDisabled func(context.Context) (T, error),
 ) (T, error) {
-	// TODO: tracing
-	if c.flag.Enabled(ctx) {
-		return ifEnabled(ctx)
+	// TODO: test
+	ctx, span := c.startSpan(ctx, "Run", trace.WithSpanKind(trace.SpanKindInternal))
+	defer span.End()
+
+	enabled := c.flag.Enabled(ctx)
+
+	span.SetAttributes(
+		attributeFeatureEnabled.Bool(enabled),
+		attributeFeatureName.String(c.flag.name))
+
+	var resultT T
+	var err error
+
+	if enabled {
+		resultT, err = ifEnabled(ctx)
+	} else {
+		resultT, err = ifDisabled(ctx)
 	}
-	return ifDisabled(ctx)
+
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	} else {
+		span.SetStatus(codes.Ok, "")
+	}
+
+	return resultT, err
 }
 
 // Flag represents a feature flag that can be enabled or disabled based on some kind of logic.
