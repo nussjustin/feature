@@ -66,7 +66,7 @@ const (
 	DefaultEnabled = DefaultDecision(Enabled)
 )
 
-// Set manages feature flags and provides the [Strategy] (using [SetStrategy]) for making dynamic decisions about
+// Set manages feature flags and can provide a [Strategy] (using [SetStrategy]) for making dynamic decisions about
 // a flags' status.
 //
 // The zero value is usable as is, using the default decision for each flag.
@@ -125,8 +125,8 @@ func (s *Set) getTracer() trace.Tracer {
 	return tracer
 }
 
-func (s *Set) newFlag(name, description string, defaultDecision DefaultDecision) *Flag {
-	f := &Flag{set: s, name: name, description: description, defaultDecision: defaultDecision}
+func (s *Set) newFlag(name, description string, strategy Strategy, defaultDecision DefaultDecision) *Flag {
+	f := &Flag{set: s, name: name, description: description, strategy: strategy, defaultDecision: defaultDecision}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -153,7 +153,12 @@ func (s *Set) newFlag(name, description string, defaultDecision DefaultDecision)
 // via the tracer obtained from the [otel.TracerProvider] set using the [Set.SetTracerProvider] method (or the
 // global [SetTracerProvider] function, if using the global [Set]).
 //
-// A Case must be obtained using either [CaseFor], [NewCase] or [RegisterCase]. The zero value is invalid.
+// See [Flag.Enabled] for an explanation on how a [Case] determines whether to return hew result from the first
+// (feature flag enabled) or second (feature flag disabled) function.
+//
+// A Case must be obtained using either [CaseFor], [NewCase] or [RegisterCase]
+//
+// The zero value is not valid.
 type Case[T any] struct {
 	flag *Flag
 }
@@ -165,16 +170,18 @@ func CaseFor[T any](f *Flag) *Case[T] {
 
 // NewCase registers and returns a new [Case] with the global [Set].
 //
-// If the given name is already is use by another case or flag, NewCase will panic.
-func NewCase[T any](name string, description string, defaultDecision DefaultDecision) *Case[T] {
-	return RegisterCase[T](&globalSet, name, description, defaultDecision)
+// See [RegisterCase] for more details.
+func NewCase[T any](name string, description string, strategy Strategy, defaultDecision DefaultDecision) *Case[T] {
+	return RegisterCase[T](&globalSet, name, description, strategy, defaultDecision)
 }
 
 // RegisterCase registers and returns a new [Flag] with the given [Set].
 //
+// A nil [Strategy] is equivalent to passing [Default].
+//
 // If the given name is already is use by another case or flag, RegisterCase will panic.
-func RegisterCase[T any](set *Set, name string, description string, defaultDecision DefaultDecision) *Case[T] {
-	return CaseFor[T](RegisterFlag(set, name, description, defaultDecision))
+func RegisterCase[T any](set *Set, name string, description string, strategy Strategy, defaultDecision DefaultDecision) *Case[T] {
+	return CaseFor[T](RegisterFlag(set, name, description, strategy, defaultDecision))
 }
 
 // Equals returns a function that compares to values of the same type using ==.
@@ -308,7 +315,6 @@ func (c *Case[T]) Run(ctx context.Context,
 	ifEnabled func(context.Context) (T, error),
 	ifDisabled func(context.Context) (T, error),
 ) (T, error) {
-	// TODO: test
 	ctx, span := c.startSpan(ctx, "Run", trace.WithSpanKind(trace.SpanKindInternal))
 	defer span.End()
 
@@ -337,7 +343,8 @@ func (c *Case[T]) Run(ctx context.Context,
 	return resultT, err
 }
 
-// Flag represents a feature flag that can be enabled or disabled based on some kind of logic.
+// Flag represents a feature flag that can be enabled or disabled based on some kind of logic and used to control
+// the behaviour of an application for example by dynamically changing code paths (see [Case]).
 //
 // Example:
 //
@@ -345,34 +352,49 @@ func (c *Case[T]) Run(ctx context.Context,
 //	        trackUser(ctx, user)
 //		}
 //
-// In many cases a [Case] can be used to simplify working with a Flag. See the documentation and examples for [Case]
+// In many cases a [Case] can be used to simplify working with a [Flag]. See the documentation and examples for [Case]
 // for more information on how to use a [Case].
 //
-// A Flag must be obtained using either [NewFlag] or [RegisterFlag]. The zero value is invalid.
+// A Flag must be obtained using either [NewFlag] or [RegisterFlag].
+//
+// The zero value is not valid.
 type Flag struct {
 	set *Set
 
 	name            string
 	description     string
+	strategy        Strategy
 	defaultDecision DefaultDecision
 }
 
 // NewFlag registers and returns a new [Flag] with the global [Set].
 //
-// If the given name is already is use by another case or flag, NewFlag will panic.
-func NewFlag(name string, description string, defaultDecision DefaultDecision) *Flag {
-	return RegisterFlag(&globalSet, name, description, defaultDecision)
+// See [RegisterFlag] for more details.
+func NewFlag(name string, description string, strategy Strategy, defaultDecision DefaultDecision) *Flag {
+	return RegisterFlag(&globalSet, name, description, strategy, defaultDecision)
 }
 
 // RegisterFlag registers and returns a new [Flag] with the given [Set].
 //
+// A nil [Strategy] is equivalent to passing [Default].
+//
 // If the given name is already is use by another case or flag, RegisterFlag will panic.
-func RegisterFlag(set *Set, name string, description string, defaultDecision DefaultDecision) *Flag {
-	return set.newFlag(name, description, defaultDecision)
+func RegisterFlag(set *Set, name string, description string, strategy Strategy, defaultDecision DefaultDecision) *Flag {
+	return set.newFlag(name, description, strategy, defaultDecision)
 }
 
-// Enabled returns true if the feature is enabled for the given context, using the [Strategy] of the associated [Set]
-// (or the [DefaultDecision] given to [NewFlag]/[RegisterFlag] as fallback).
+// Enabled returns true if the feature is enabled for the given context.
+//
+// The status of the flag is determined as follows:
+//
+//  1. The [Strategy] of the [Flag] is checked. If no [Strategy] is set on the [Flag] or the [Strategy] returns [Default]
+//     Enabled will continue to the next step.
+//
+//  2. The [Strategy] of the associated [Set] is checked. If no [Strategy] is set on the [Set] or the [Strategy] returns
+//     [Default], Enabled will continue to the next step.
+//
+//  3. If the previous steps did not result in a final decision ([Enabled] or [Disabled]), the [DefaultDecision] of the
+//     flag is used.
 //
 // Example:
 //
@@ -380,17 +402,19 @@ func RegisterFlag(set *Set, name string, description string, defaultDecision Def
 //	        trackUser(ctx, user)
 //		}
 func (f *Flag) Enabled(ctx context.Context) bool {
-	d := Default
-
-	if h := f.set.strategy.Load(); h != nil {
-		d = (*h).Enabled(ctx, f.name)
+	if f.strategy != nil {
+		if d := f.strategy.Enabled(ctx, f.name); d != Default {
+			return d == Enabled
+		}
 	}
 
-	if d == Default {
-		d = Decision(f.defaultDecision)
+	if s := f.set.strategy.Load(); s != nil {
+		if d := (*s).Enabled(ctx, f.name); d != Default {
+			return d == Enabled
+		}
 	}
 
-	return d == Enabled
+	return Decision(f.defaultDecision) == Enabled
 }
 
 // Name returns the name passed to [NewFlag] or [RegisterFlag].
