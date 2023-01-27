@@ -34,9 +34,9 @@ type Decision string
 const (
 	// Default hands over the decision to the Flag.
 	Default Decision = "default"
-	// Disabled disables a [Flag] and the new code path of the corresponding case.
+	// Disabled disables a feature flag and the new code path of the corresponding case.
 	Disabled Decision = "disabled"
-	// Enabled enables a [Flag] and the new code path of the corresponding case.
+	// Enabled enables a feature flag and the new code path of the corresponding case.
 	Enabled Decision = "enabled"
 )
 
@@ -61,10 +61,10 @@ func (d Decision) Enabled(context.Context, string) Decision {
 type DefaultDecision string
 
 const (
-	// DefaultDisabled causes a [Flag] or [Case] to treat a [Decision] of [Default] as [Disabled].
-	DefaultDisabled = DefaultDecision(Disabled)
-	// DefaultEnabled causes a [Flag] or [Case] to treat a [Decision] of [Default] as [Enabled].
-	DefaultEnabled = DefaultDecision(Enabled)
+	// DefaultDisabled causes flags and cases to treat a Default decision as Disabled.
+	DefaultDisabled DefaultDecision = "disabled"
+	// DefaultEnabled causes flags and cases to treat a Default decision as Enabled.
+	DefaultEnabled DefaultDecision = "enabled"
 )
 
 // Set manages feature flags and can provide a [Strategy] (using [SetStrategy]) for making dynamic decisions about
@@ -196,11 +196,11 @@ func (c *Case[T]) startSpan(ctx context.Context, spanName string, opts ...trace.
 	return c.flag.set.getTracer().Start(ctx, spanName, opts...)
 }
 
-// PanicError is used to wrap the values of recovered panics in [Case.Experiment].
+// PanicError holds the error recovered from one of the called functions when running an experiment.
 type PanicError struct {
 	name string
 
-	// Value is the value returned by [recover].
+	// Value is the value recovered from the panic.
 	Value any
 }
 
@@ -247,10 +247,6 @@ func (c *Case[T]) run(ctx context.Context, name string, f func(context.Context) 
 //
 // When using values of a type that is comparable using ==, the global function [Equals] can be used to create the
 // comparison function.
-//
-// Example:
-//
-//	c.Experiment(ctx, newFunc, oldFunc, feature.Equals[User])
 func (c *Case[T]) Experiment(ctx context.Context,
 	experimental func(context.Context) (T, error),
 	control func(context.Context) (T, error),
@@ -340,10 +336,6 @@ func handleExperimentResult[T any](
 }
 
 // Run checks if the associated flag is enabled and runs either ifEnabled or ifDisabled and returns their result.
-//
-// Example:
-//
-//	user, err := c.Run(ctx, getUserV2, getUser)
 func (c *Case[T]) Run(ctx context.Context,
 	ifEnabled func(context.Context) (T, error),
 	ifDisabled func(context.Context) (T, error),
@@ -376,14 +368,8 @@ func (c *Case[T]) Run(ctx context.Context,
 	return resultT, err
 }
 
-// Flag represents a feature flag that can be enabled or disabled based on some kind of logic and used to control
-// the behaviour of an application for example by dynamically changing code paths (see [Case]).
-//
-// Example:
-//
-//	    if trackingFlag.Enabled(ctx) {
-//	        trackUser(ctx, user)
-//		}
+// Flag represents a feature flag that can be enabled or disabled (toggled) dynamically at runtime and used to control
+// the behaviour of an application, for example by dynamically changing code paths (see [Case]).
 //
 // In many cases a [Case] can be used to simplify working with a [Flag]. See the documentation and examples for [Case]
 // for more information on how to use a [Case].
@@ -431,9 +417,9 @@ func RegisterFlag(set *Set, name string, description string, strategy Strategy, 
 //
 // Example:
 //
-//	    if trackingFlag.Enabled(ctx) {
-//	        trackUser(ctx, user)
-//		}
+//	if trackingFlag.Enabled(ctx) {
+//	   trackUser(ctx, user)
+//	}
 func (f *Flag) Enabled(ctx context.Context) bool {
 	if f.strategy != nil {
 		if d := f.strategy.Enabled(ctx, f.name); d != Default {
@@ -464,11 +450,11 @@ func (f *Flag) Description() string {
 //
 // A Strategy must be safe for concurrent use.
 type Strategy interface {
-	// Enabled takes the name of a feature flag and returns a [Decision] on whether the feature should be enabled.
+	// Enabled takes the name of a feature flag and returns a Decision that determines if the flag should be enabled.
 	Enabled(ctx context.Context, name string) Decision
 }
 
-// StrategyFunc implements a [Strategy] that uses the function as implementation of [Strategy.Enabled].
+// StrategyFunc implements a [Strategy] by calling itself.
 type StrategyFunc func(ctx context.Context, name string) Decision
 
 var _ Strategy = (StrategyFunc)(nil)
