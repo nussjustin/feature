@@ -53,19 +53,10 @@ func IsTester(context.Context) bool {
 	return false
 }
 
-func ExampleEnabled() {
-	testerStrategy = feature.StrategyFunc(func(ctx context.Context, _ string) feature.Decision {
-		// Enable all flags for testers
-		return feature.EnabledIf(IsTester(ctx))
-	})
-
-	feature.SetStrategy(testerStrategy)
-}
-
 func ExampleIf() {
 	testerStrategy = feature.StrategyFunc(func(ctx context.Context, _ string) feature.Decision {
 		// Enable all flags for testers
-		return feature.If(IsTester(ctx), feature.Enabled, feature.Default)
+		return feature.If(IsTester(ctx))
 	})
 
 	feature.SetStrategy(testerStrategy)
@@ -104,11 +95,11 @@ func TestSetStrategy(t *testing.T) {
 	}
 
 	lower := feature.StrategyFunc(func(_ context.Context, name string) feature.Decision {
-		return feature.EnabledIf(strings.ToLower(trim(name)) == trim(name))
+		return feature.If(strings.ToLower(trim(name)) == trim(name))
 	})
 
 	upper := feature.StrategyFunc(func(_ context.Context, name string) feature.Decision {
-		return feature.EnabledIf(strings.ToUpper(trim(name)) == trim(name))
+		return feature.If(strings.ToUpper(trim(name)) == trim(name))
 	})
 
 	lowerFlag := feature.NewFlag("TestSetStrategy/lower", "", nil, feature.DefaultDisabled)
@@ -153,11 +144,11 @@ func TestSet_SetStrategy(t *testing.T) {
 	var set feature.Set
 
 	lower := feature.StrategyFunc(func(_ context.Context, name string) feature.Decision {
-		return feature.EnabledIf(strings.ToLower(name) == name)
+		return feature.If(strings.ToLower(name) == name)
 	})
 
 	upper := feature.StrategyFunc(func(_ context.Context, name string) feature.Decision {
-		return feature.EnabledIf(strings.ToUpper(name) == name)
+		return feature.If(strings.ToUpper(name) == name)
 	})
 
 	lowerFlag := feature.RegisterFlag(&set, "lower", "", nil, feature.DefaultDisabled)
@@ -864,7 +855,7 @@ func TestFlag_Enabled(t *testing.T) {
 
 func TestStrategyFunc_Enabled(t *testing.T) {
 	s := feature.StrategyFunc(func(_ context.Context, name string) feature.Decision {
-		return feature.EnabledIf(name == "Rob")
+		return feature.If(name == "Rob")
 	})
 
 	assertDecision(t, s, "Brad", feature.Disabled)
@@ -884,7 +875,7 @@ func ExampleStrategyMap() {
 
 	staticStrategy := make(feature.StrategyMap, len(staticFlags))
 	for name, enabled := range staticFlags {
-		staticStrategy[name] = feature.EnabledIf(enabled)
+		staticStrategy[name] = feature.If(enabled)
 	}
 
 	feature.SetStrategy(staticStrategy)
