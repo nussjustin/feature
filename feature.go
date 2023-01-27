@@ -288,22 +288,52 @@ func (c *Case[T]) Experiment(ctx context.Context,
 
 	wg.Wait()
 
-	switch {
-	case experimentErr != nil:
-		span.SetStatus(codes.Error, "experiment failed")
-	case controlErr != nil:
-		span.SetStatus(codes.Error, "control failed")
-	case !equals(experimentT, controlT):
-		span.SetStatus(codes.Error, "experimental result does not match control value")
-	default:
-		span.SetStatus(codes.Ok, "")
-	}
+	handleExperimentResult(span, experimentT, experimentErr, controlT, controlErr, isEnabled, equals)
 
 	if isEnabled {
 		return experimentT, experimentErr
 	}
 
 	return controlT, controlErr
+}
+
+func handleExperimentResult[T any](
+	span trace.Span,
+
+	experimentT T,
+	experimentErr error,
+
+	controlT T,
+	controlErr error,
+
+	isEnabled bool,
+
+	equals func(new T, old T) bool,
+) {
+	switch {
+	// If both failed, the whole operation failed
+	case experimentErr != nil && controlErr != nil:
+		span.SetStatus(codes.Error, "control and experiment failed")
+
+	// If the active (enabled) path failed, we make sure to explicitly state this.
+	case experimentErr != nil && isEnabled:
+		span.SetStatus(codes.Error, "active code path (experiment) failed")
+	case controlErr != nil && !isEnabled:
+		span.SetStatus(codes.Error, "active code path (control) failed")
+
+	// Otherwise on error we explicitly state that only the inactive path failed.
+	case experimentErr != nil:
+		span.SetStatus(codes.Error, "inactive code path (experiment) failed")
+	case controlErr != nil:
+		span.SetStatus(codes.Error, "inactive code path (experiment) failed")
+
+	// If there was no error we can finally compare the results
+	case !equals(experimentT, controlT):
+		span.SetStatus(codes.Error, "result mismatch")
+
+	default:
+		span.SetStatus(codes.Ok, "")
+	}
 }
 
 // Run checks if the associated flag is enabled and runs either ifEnabled or ifDisabled and returns their result.

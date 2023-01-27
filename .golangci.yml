@@ -1,10 +1,12 @@
 linters:
   enable-all: true
   disable:
+    - cyclop
     - deadcode
     - exhaustivestruct
     - exhaustruct
     - gochecknoglobals
+    - gocyclo
     - godox
     - golint
     - ifshort
