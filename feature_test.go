@@ -544,6 +544,10 @@ func TestCase_Experiment_Tracing(t *testing.T) {
 
 		assertFeatureAttributes(t, byName["Experiment"].Attributes(), name, true)
 
+		if overall == codes.Ok {
+			assertAttributeBool(t, byName["Experiment"].Attributes(), "feature.experiment.match", overall == codes.Ok)
+		}
+
 		if got, want := byName["Experimental"].Status().Code, experimental; got != want {
 			t.Errorf("experiment %d: got Status().Code = %q, want %q", i, got, want)
 		}
@@ -888,11 +892,33 @@ func TestStrategyMap_Enabled(t *testing.T) {
 	assertDecision(t, s, "Rob", feature.Enabled)
 }
 
+func assertAttributeBool(tb testing.TB, attrs []attribute.KeyValue, name string, want bool) {
+	tb.Helper()
+
+	for _, attr := range attrs {
+		if string(attr.Key) != name {
+			continue
+		}
+
+		if !attr.Valid() {
+			tb.Errorf("attribute %q is invalid", attr.Key)
+		}
+
+		if got := attr.Value.AsBool(); got != want {
+			tb.Errorf("got value %t for attribute %q, want %t", got, attr.Key, want)
+		}
+
+		return
+	}
+
+	tb.Errorf("attribute %q not found", name)
+}
+
 func assertFeatureAttributes(tb testing.TB, attrs []attribute.KeyValue, name string, enabled bool) {
 	tb.Helper()
 
-	if got, want := len(attrs), 2; got != want {
-		tb.Errorf("got %d attributes for experiment/run span, want %d", got, want)
+	if got, want := len(attrs), 2; got < want {
+		tb.Errorf("got %d attributes for experiment/run span, want at least %d", got, want)
 	}
 
 	for _, attr := range attrs {

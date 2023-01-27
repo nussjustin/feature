@@ -19,6 +19,7 @@ const (
 var (
 	attributeFeatureEnabled  = attribute.Key("feature.enabled")
 	attributeFeatureName     = attribute.Key("feature.name")
+	attributeExperimentMatch = attribute.Key("feature.experiment.match")
 	attributeExperimentPanic = attribute.Key("feature.experiment.panic")
 )
 
@@ -329,9 +330,11 @@ func handleExperimentResult[T any](
 
 	// If there was no error we can finally compare the results
 	case !equals(experimentT, controlT):
+		span.SetAttributes(attributeExperimentMatch.Bool(false))
 		span.SetStatus(codes.Error, "result mismatch")
 
 	default:
+		span.SetAttributes(attributeExperimentMatch.Bool(true))
 		span.SetStatus(codes.Ok, "")
 	}
 }
