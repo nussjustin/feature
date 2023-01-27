@@ -42,7 +42,12 @@ const (
 
 var _ Strategy = Default
 
-// If returns ifTrue if cond is true, otherwise ifFalse is returned.
+// EnabledIf returns Enabled if the first argument is true, or Disabled otherwise.
+func EnabledIf(cond bool) Decision {
+	return If(cond, Enabled, Disabled)
+}
+
+// If returns ifTrue if the first argument is true, otherwise ifFalse is returned.
 func If(cond bool, ifTrue, ifFalse Decision) Decision {
 	if cond {
 		return ifTrue
