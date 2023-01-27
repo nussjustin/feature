@@ -16,14 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	"go.opentelemetry.io/otel/codes"
-
-	"go.opentelemetry.io/otel/sdk/trace"
-
 	"github.com/nussjustin/feature"
-
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
