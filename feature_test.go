@@ -531,6 +531,8 @@ func TestCase_Experiment_Tracing(t *testing.T) {
 	)
 
 	check := func(i int, overall, experimental, control codes.Code) {
+		t.Helper()
+
 		byName := map[string]trace.ReadOnlySpan{}
 		for _, span := range spans[i*spansPerTrace:][:spansPerTrace] {
 			byName[span.Name()] = span
