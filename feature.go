@@ -466,6 +466,8 @@ func (f *Flag) Description() string {
 }
 
 // Strategy defines an interface used for deciding on whether a feature is enabled or not.
+//
+// A Strategy must be safe for concurrent use.
 type Strategy interface {
 	// Enabled takes the name of a feature flag and returns a [Decision] on whether the feature should be enabled.
 	Enabled(ctx context.Context, name string) Decision
