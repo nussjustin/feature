@@ -91,39 +91,64 @@ func TestCase_Experiment_Tracing(t *testing.T) {
 }
 
 func TestCase_Run_Tracing(t *testing.T) {
-	var set feature.Set
+	t.Run("Success", func(t *testing.T) {
+		var set feature.Set
 
-	ctx := context.Background()
+		c := feature.RegisterCase[int](&set, "case name", "", nil, feature.DefaultDisabled)
 
-	const name = "case name"
+		set.SetStrategy(feature.Enabled)
+		set.SetTracer(feature.Tracer{
+			Decision:   assertTracedDecision(t, feature.Enabled),
+			Case:       assertTracedCase(t, feature.Enabled, 2, nil),
+			Experiment: assertNoTracedExperiment(t),
+			Run:        assertTracedRun(t, feature.Enabled, 2, nil),
+		})
 
-	c := feature.RegisterCase[int](&set, name, "", nil, feature.DefaultDisabled)
-
-	set.SetStrategy(feature.Enabled)
-	set.SetTracer(feature.Tracer{
-		Decision:   assertTracedDecision(t, feature.Enabled),
-		Case:       assertTracedCase(t, feature.Enabled, 2, nil),
-		Experiment: assertNoTracedExperiment(t),
-		Run:        assertTracedRun(t, feature.Enabled, 2, nil),
+		_, _ = c.Run(context.Background(),
+			func(ctx context.Context) (int, error) { return 2, nil },
+			func(ctx context.Context) (int, error) { return 1, nil })
 	})
 
-	_, _ = c.Run(ctx,
-		func(ctx context.Context) (int, error) { return 2, nil },
-		func(ctx context.Context) (int, error) { return 1, nil })
+	t.Run("Error", func(t *testing.T) {
+		var set feature.Set
 
-	err1, err2 := errors.New("error 1"), errors.New("error 2")
+		c := feature.RegisterCase[int](&set, "case name", "", nil, feature.DefaultDisabled)
 
-	set.SetStrategy(feature.Disabled)
-	set.SetTracer(feature.Tracer{
-		Decision:   assertTracedDecision(t, feature.Disabled),
-		Case:       assertTracedCase(t, feature.Disabled, 1, err1),
-		Experiment: assertNoTracedExperiment(t),
-		Run:        assertTracedRun(t, feature.Disabled, 1, err1),
+		err1, err2 := errors.New("error 1"), errors.New("error 2")
+
+		set.SetStrategy(feature.Disabled)
+		set.SetTracer(feature.Tracer{
+			Decision:   assertTracedDecision(t, feature.Disabled),
+			Case:       assertTracedCase(t, feature.Disabled, 1, err1),
+			Experiment: assertNoTracedExperiment(t),
+			Run:        assertTracedRun(t, feature.Disabled, 1, err1),
+		})
+
+		_, _ = c.Run(context.Background(),
+			func(ctx context.Context) (int, error) { return 2, err2 },
+			func(ctx context.Context) (int, error) { return 1, err1 })
 	})
 
-	_, _ = c.Run(ctx,
-		func(ctx context.Context) (int, error) { return 2, err2 },
-		func(ctx context.Context) (int, error) { return 1, err1 })
+	t.Run("Panic", func(t *testing.T) {
+		var set feature.Set
+
+		c := feature.RegisterCase[int](&set, "case name", "", nil, feature.DefaultDisabled)
+
+		err := errors.New("error 1")
+
+		set.SetStrategy(feature.Disabled)
+		set.SetTracer(feature.Tracer{
+			Decision:     assertTracedDecision(t, feature.Disabled),
+			Case:         assertTracedCase(t, feature.Disabled, 0, err),
+			CasePanicked: assertTracedCasePanic(t, feature.Disabled, err),
+			Experiment:   assertNoTracedExperiment(t),
+			Run:          assertTracedRun(t, feature.Disabled, 0, err),
+		})
+
+		_, _ = c.Run(context.Background(),
+			func(ctx context.Context) (int, error) { return 2, nil },
+			func(ctx context.Context) (int, error) { panic(err) })
+	})
 }
 
 func TestFlag_Enabled_Tracing(t *testing.T) {
@@ -212,6 +237,20 @@ func assertTracedCase(
 
 			assertError(tb, wantErr, gotErr)
 		}
+	}
+}
+
+func assertTracedCasePanic(
+	tb testing.TB,
+	wantDecision feature.Decision,
+	wantErr error,
+) func(ctx context.Context, flag *feature.Flag, decision feature.Decision, panicError *feature.PanicError) {
+	return func(ctx context.Context, _ *feature.Flag, gotDecision feature.Decision, gotErr *feature.PanicError) {
+		if gotDecision != wantDecision {
+			tb.Errorf("got decision %s, want %s", gotDecision, wantDecision)
+		}
+
+		assertError(tb, wantErr, gotErr)
 	}
 }
 

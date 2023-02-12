@@ -14,6 +14,52 @@ import (
 )
 
 func TestTracer(t *testing.T) {
+	t.Run("Decision", func(t *testing.T) {
+		t.Run("Enabled", func(t *testing.T) {
+			flag := feature.RegisterFlag(
+				&feature.Set{},
+				"Case",
+				"",
+				nil,
+				feature.DefaultDisabled,
+			)
+
+			spanRecorder := tracetest.NewSpanRecorder()
+			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
+			tracer := otelfeature.Tracer(provider)
+
+			ctx, span := provider.Tracer("").Start(context.Background(), "test")
+			tracer.Decision(ctx, flag, feature.Enabled)
+			span.End()
+
+			assertEvent(t, getSpan(t, spanRecorder, "test"), "decision",
+				otelfeature.AttributeFeatureEnabled.Bool(true),
+				otelfeature.AttributeFeatureName.String(flag.Name()))
+		})
+
+		t.Run("Disabled", func(t *testing.T) {
+			flag := feature.RegisterFlag(
+				&feature.Set{},
+				"Case",
+				"",
+				nil,
+				feature.DefaultDisabled,
+			)
+
+			spanRecorder := tracetest.NewSpanRecorder()
+			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
+			tracer := otelfeature.Tracer(provider)
+
+			ctx, span := provider.Tracer("").Start(context.Background(), "test")
+			tracer.Decision(ctx, flag, feature.Disabled)
+			span.End()
+
+			assertEvent(t, getSpan(t, spanRecorder, "test"), "decision",
+				otelfeature.AttributeFeatureEnabled.Bool(false),
+				otelfeature.AttributeFeatureName.String(flag.Name()))
+		})
+	})
+
 	t.Run("Case", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			flag := feature.RegisterFlag(
@@ -32,8 +78,8 @@ func TestTracer(t *testing.T) {
 			done(nil, nil)
 
 			recordedSpan := getSpan(t, spanRecorder, "Enabled")
-			assertAttributeBool(t, recordedSpan, otelfeature.AttributeFeatureEnabled, true)
-			assertAttributeString(t, recordedSpan, otelfeature.AttributeFeatureName, flag.Name())
+			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureEnabled, true)
+			assertAttributeString(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureName, flag.Name())
 			assertSpanOk(t, recordedSpan)
 		})
 
@@ -54,10 +100,33 @@ func TestTracer(t *testing.T) {
 			done(nil, errors.New("some error"))
 
 			recordedSpan := getSpan(t, spanRecorder, "Disabled")
-			assertAttributeBool(t, recordedSpan, otelfeature.AttributeFeatureEnabled, false)
-			assertAttributeString(t, recordedSpan, otelfeature.AttributeFeatureName, flag.Name())
+			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureEnabled, false)
+			assertAttributeString(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureName, flag.Name())
 			assertSpanError(t, recordedSpan, "some error")
 		})
+	})
+
+	t.Run("Case Panicked", func(t *testing.T) {
+		flag := feature.RegisterFlag(
+			&feature.Set{},
+			"Case",
+			"",
+			nil,
+			feature.DefaultDisabled,
+		)
+
+		spanRecorder := tracetest.NewSpanRecorder()
+		provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
+		tracer := otelfeature.Tracer(provider)
+
+		ctx, span := provider.Tracer("").Start(context.Background(), "test")
+		tracer.CasePanicked(ctx, flag, feature.Enabled, &feature.PanicError{
+			Recovered: "hello world",
+		})
+		span.End()
+
+		recordedSpan := getSpan(t, spanRecorder, "test")
+		assertEvent(t, recordedSpan, "panic", otelfeature.AttributeRecoveredValue.String("hello world"))
 	})
 
 	t.Run("Experiment", func(t *testing.T) {
@@ -78,9 +147,9 @@ func TestTracer(t *testing.T) {
 			done(feature.Enabled, nil, nil, true)
 
 			recordedSpan := getSpan(t, spanRecorder, flag.Name())
-			assertAttributeBool(t, recordedSpan, otelfeature.AttributeFeatureEnabled, true)
-			assertAttributeString(t, recordedSpan, otelfeature.AttributeFeatureName, flag.Name())
-			assertAttributeBool(t, recordedSpan, otelfeature.AttributeExperimentSuccess, true)
+			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureEnabled, true)
+			assertAttributeString(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureName, flag.Name())
+			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeExperimentSuccess, true)
 			assertSpanOk(t, recordedSpan)
 		})
 
@@ -101,9 +170,9 @@ func TestTracer(t *testing.T) {
 			done(feature.Enabled, nil, errors.New("failed"), false)
 
 			recordedSpan := getSpan(t, spanRecorder, flag.Name())
-			assertAttributeBool(t, recordedSpan, otelfeature.AttributeFeatureEnabled, true)
-			assertAttributeString(t, recordedSpan, otelfeature.AttributeFeatureName, flag.Name())
-			assertAttributeBool(t, recordedSpan, otelfeature.AttributeExperimentSuccess, false)
+			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureEnabled, true)
+			assertAttributeString(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureName, flag.Name())
+			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeExperimentSuccess, false)
 			assertSpanError(t, recordedSpan, "failed")
 		})
 	})
@@ -126,8 +195,8 @@ func TestTracer(t *testing.T) {
 			done(feature.Enabled, nil, nil)
 
 			recordedSpan := getSpan(t, spanRecorder, flag.Name())
-			assertAttributeBool(t, recordedSpan, otelfeature.AttributeFeatureEnabled, true)
-			assertAttributeString(t, recordedSpan, otelfeature.AttributeFeatureName, flag.Name())
+			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureEnabled, true)
+			assertAttributeString(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureName, flag.Name())
 			assertSpanOk(t, recordedSpan)
 		})
 
@@ -148,8 +217,8 @@ func TestTracer(t *testing.T) {
 			done(feature.Enabled, nil, errors.New("failed"))
 
 			recordedSpan := getSpan(t, spanRecorder, flag.Name())
-			assertAttributeBool(t, recordedSpan, otelfeature.AttributeFeatureEnabled, true)
-			assertAttributeString(t, recordedSpan, otelfeature.AttributeFeatureName, flag.Name())
+			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureEnabled, true)
+			assertAttributeString(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureName, flag.Name())
 			assertSpanError(t, recordedSpan, "failed")
 		})
 	})
@@ -159,26 +228,26 @@ func ExampleTracer() {
 	feature.SetTracer(otelfeature.Tracer(nil))
 }
 
-func assertAttributeBool(tb testing.TB, span trace.ReadOnlySpan, key attribute.Key, want bool) {
+func assertAttributeBool(tb testing.TB, attrs []attribute.KeyValue, key attribute.Key, want bool) {
 	tb.Helper()
 
-	if got := getAttributeOfType(tb, span, key, attribute.BOOL).AsBool(); got != want {
+	if got := getAttributeOfType(tb, attrs, key, attribute.BOOL).AsBool(); got != want {
 		tb.Errorf("got %s = %t, want %t", key, got, want)
 	}
 }
 
-func assertAttributeString(tb testing.TB, span trace.ReadOnlySpan, key attribute.Key, want string) {
+func assertAttributeString(tb testing.TB, attrs []attribute.KeyValue, key attribute.Key, want string) {
 	tb.Helper()
 
-	if got := getAttributeOfType(tb, span, key, attribute.STRING).AsString(); got != want {
+	if got := getAttributeOfType(tb, attrs, key, attribute.STRING).AsString(); got != want {
 		tb.Errorf("got %s = %q, want %q", key, got, want)
 	}
 }
 
-func getAttribute(tb testing.TB, span trace.ReadOnlySpan, key attribute.Key) attribute.Value {
+func getAttribute(tb testing.TB, attrs []attribute.KeyValue, key attribute.Key) attribute.Value {
 	tb.Helper()
 
-	for _, attr := range span.Attributes() {
+	for _, attr := range attrs {
 		if attr.Key != key {
 			continue
 		}
@@ -194,10 +263,10 @@ func getAttribute(tb testing.TB, span trace.ReadOnlySpan, key attribute.Key) att
 	return attribute.Value{}
 }
 
-func getAttributeOfType(tb testing.TB, span trace.ReadOnlySpan, key attribute.Key, type_ attribute.Type) attribute.Value {
+func getAttributeOfType(tb testing.TB, attrs []attribute.KeyValue, key attribute.Key, type_ attribute.Type) attribute.Value {
 	tb.Helper()
 
-	value := getAttribute(tb, span, key)
+	value := getAttribute(tb, attrs, key)
 
 	if value.Type() != type_ {
 		tb.Fatalf("attribute %s has wrong type: %s", key, value.Type())
@@ -206,7 +275,39 @@ func getAttributeOfType(tb testing.TB, span trace.ReadOnlySpan, key attribute.Ke
 	return value
 }
 
+func getEvent(tb testing.TB, span trace.ReadOnlySpan, name string) trace.Event {
+	tb.Helper()
+
+	for _, event := range span.Events() {
+		if event.Name == name {
+			return event
+		}
+	}
+
+	tb.Fatalf("event not found: %s", name)
+	return trace.Event{}
+}
+
+func assertEvent(tb testing.TB, span trace.ReadOnlySpan, name string, attrs ...attribute.KeyValue) {
+	tb.Helper()
+
+	event := getEvent(tb, span, name)
+
+	for _, attr := range attrs {
+		switch attr.Value.Type() {
+		case attribute.BOOL:
+			assertAttributeBool(tb, event.Attributes, attr.Key, attr.Value.AsBool())
+		case attribute.STRING:
+			assertAttributeString(tb, event.Attributes, attr.Key, attr.Value.AsString())
+		default:
+			tb.Fatalf("type not handled: %s", attr.Value.Type())
+		}
+	}
+}
+
 func getSpan(tb testing.TB, sr *tracetest.SpanRecorder, name string) trace.ReadOnlySpan {
+	tb.Helper()
+
 	for _, span := range sr.Ended() {
 		if span.Name() == name {
 			return span

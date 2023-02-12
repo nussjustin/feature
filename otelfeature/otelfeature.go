@@ -2,6 +2,7 @@ package otelfeature
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/nussjustin/feature"
 	"go.opentelemetry.io/otel"
@@ -23,6 +24,9 @@ var (
 
 	// AttributeExperimentSuccess is true if an experiment ran with not errors and the results are considered equal.
 	AttributeExperimentSuccess = attribute.Key("feature.experiment.success")
+
+	// AttributeRecoveredValue contains the recovered value from a panic converted into a string using fmt.Sprint.
+	AttributeRecoveredValue = attribute.Key("feature.case.recovered")
 )
 
 func Tracer(tp trace.TracerProvider) feature.Tracer {
@@ -33,9 +37,20 @@ func Tracer(tp trace.TracerProvider) feature.Tracer {
 	tracer := tp.Tracer(tracerName)
 
 	return feature.Tracer{
-		Case:       createCaseCallback(tracer),
-		Experiment: createExperimentCallback(tracer),
-		Run:        createRunCallback(tracer),
+		Decision:     createDecisionCallback(),
+		Case:         createCaseCallback(tracer),
+		CasePanicked: createCasePanickedCallback(),
+		Experiment:   createExperimentCallback(tracer),
+		Run:          createRunCallback(tracer),
+	}
+}
+
+func createDecisionCallback() func(context.Context, *feature.Flag, feature.Decision) {
+	return func(ctx context.Context, flag *feature.Flag, decision feature.Decision) {
+		span := trace.SpanFromContext(ctx)
+		span.AddEvent("decision", trace.WithAttributes(
+			AttributeFeatureEnabled.Bool(decision == feature.Enabled),
+			AttributeFeatureName.String(flag.Name())))
 	}
 }
 
@@ -54,6 +69,19 @@ func createCaseCallback(t trace.Tracer) func(context.Context, *feature.Flag, fea
 			}
 
 			span.End()
+		}
+	}
+}
+
+func createCasePanickedCallback() func(context.Context, *feature.Flag, feature.Decision, *feature.PanicError) {
+	return func(ctx context.Context, flag *feature.Flag, decision feature.Decision, err *feature.PanicError) {
+		span := trace.SpanFromContext(ctx)
+
+		if span.IsRecording() {
+			formatted := fmt.Sprint(err.Recovered)
+
+			span.AddEvent("panic", trace.WithAttributes(
+				AttributeRecoveredValue.String(formatted)))
 		}
 	}
 }

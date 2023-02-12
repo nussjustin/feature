@@ -140,6 +140,9 @@ type Tracer struct {
 	// The returned function can be nil.
 	Case func(context.Context, *Flag, Decision) (context.Context, func(result any, err error))
 
+	// CasePanicked is called when a panic was caught as part of a function called by a [Case].
+	CasePanicked func(ctx context.Context, flag *Flag, decision Decision, panicError *PanicError)
+
 	// Experiment is called at the beginning of every call to [Case.Experiment].
 	//
 	// The returned function is called after both functions given to [Case.Experiment] have returned and is passed
@@ -235,7 +238,13 @@ func (c *Case[T]) run(ctx context.Context, d Decision, f func(context.Context) (
 
 	defer func() {
 		if v := recover(); v != nil {
-			err = &PanicError{Recovered: v}
+			panicErr := &PanicError{Recovered: v}
+
+			if t := c.flag.set.getTracer(); t.CasePanicked != nil {
+				t.CasePanicked(ctx, c.flag, d, panicErr)
+			}
+
+			err = panicErr
 		}
 	}()
 
