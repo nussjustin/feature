@@ -17,10 +17,6 @@ import (
 	"time"
 
 	"github.com/nussjustin/feature"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 func ExampleIf() {
@@ -93,11 +89,22 @@ func TestSetStrategy(t *testing.T) {
 	assertEnabled(t, upperFlag)
 }
 
-func TestSetTracerProvider(t *testing.T) {
-	sr := tracetest.NewSpanRecorder()
-	provider := trace.NewTracerProvider(trace.WithSpanProcessor(sr))
+func TestSetTracer(t *testing.T) {
+	var caseCount, decisionCount, runCount int
 
-	feature.SetTracerProvider(provider)
+	feature.SetTracer(feature.Tracer{
+		Decision: func(context.Context, *feature.Flag, feature.Decision) {
+			decisionCount++
+		},
+		Case: func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
+			caseCount++
+			return context.Background(), func(any, error) {}
+		},
+		Run: func(context.Context, *feature.Flag) (context.Context, func(feature.Decision, any, error)) {
+			runCount++
+			return context.Background(), func(feature.Decision, any, error) {}
+		},
+	})
 
 	c := feature.NewCase[int]("TestSetTracerProvider", "", nil, feature.DefaultDisabled)
 
@@ -105,8 +112,16 @@ func TestSetTracerProvider(t *testing.T) {
 		func(context.Context) (int, error) { return 2, nil },
 		func(context.Context) (int, error) { return 1, nil })
 
-	if got, want := len(sr.Ended()), 1; got < want {
-		t.Errorf("got %d spans, want at least %d", got, want)
+	if got, want := caseCount, 1; got != want {
+		t.Errorf("got %d calls to Case, want %d", got, want)
+	}
+
+	if got, want := decisionCount, 1; got != want {
+		t.Errorf("got %d calls to Decision, want %d", got, want)
+	}
+
+	if got, want := runCount, 1; got != want {
+		t.Errorf("got %d calls to Experiment, want %d", got, want)
 	}
 }
 
@@ -254,6 +269,76 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("Mismatch", func(t *testing.T) {
 		t.Run("ReturnsOldWhenDisabled", newMatchTest(1, false, feature.DefaultDisabled))
 		t.Run("ReturnsNewWhenEnabled", newMatchTest(2, false, feature.DefaultEnabled))
+	})
+
+	t.Run("EqualsIsCalledOnSuccess", func(t *testing.T) {
+		var set feature.Set
+
+		set.SetStrategy(feature.Enabled)
+
+		c := feature.RegisterCase[int](&set, "case", "", nil, feature.DefaultDisabled)
+
+		var equalsCalled bool
+
+		_, _ = c.Experiment(context.Background(),
+			func(context.Context) (int, error) { return 2, nil },
+			func(context.Context) (int, error) { return 1, nil },
+			// pretend that both results are equal
+			func(new, old int) bool {
+				equalsCalled = true
+
+				return true
+			})
+
+		if !equalsCalled {
+			t.Errorf("equals was not called")
+		}
+	})
+
+	t.Run("EqualsIsNotCalledOnError", func(t *testing.T) {
+		var set feature.Set
+
+		set.SetStrategy(feature.Enabled)
+
+		c := feature.RegisterCase[int](&set, "case", "", nil, feature.DefaultDisabled)
+
+		for _, strategy := range []feature.Strategy{feature.Disabled, feature.Enabled} {
+			var equalsCalled bool
+
+			equals := func(new, old int) bool {
+				equalsCalled = true
+				return true
+			}
+
+			// Equals should not be called if any of the functions returns an error, even if it's not the enabled
+			// function.
+
+			{
+				set.SetStrategy(strategy)
+
+				_, _ = c.Experiment(context.Background(),
+					func(context.Context) (int, error) { return 2, errors.New("error 2") },
+					func(context.Context) (int, error) { return 1, nil },
+					equals)
+
+				if equalsCalled {
+					t.Errorf("equals was called")
+				}
+			}
+
+			{
+				set.SetStrategy(strategy)
+
+				_, _ = c.Experiment(context.Background(),
+					func(context.Context) (int, error) { return 2, nil },
+					func(context.Context) (int, error) { return 1, errors.New("error 1") },
+					equals)
+
+				if equalsCalled {
+					t.Errorf("equals was called")
+				}
+			}
+		}
 	})
 
 	t.Run("StrategyIsUsed", func(t *testing.T) {
@@ -445,111 +530,6 @@ func TestCase_Experiment(t *testing.T) {
 	})
 }
 
-func TestCase_Experiment_Tracing(t *testing.T) {
-	var set feature.Set
-
-	sr := tracetest.NewSpanRecorder()
-	provider := trace.NewTracerProvider(trace.WithSpanProcessor(sr))
-
-	set.SetTracerProvider(provider)
-
-	const name = "some case"
-
-	c := feature.RegisterCase[int](&set, name, "", nil, feature.DefaultEnabled)
-
-	// Success
-	_, _ = c.Experiment(context.Background(),
-		func(context.Context) (int, error) { return 1, nil },
-		func(context.Context) (int, error) { return 1, nil },
-		feature.Equals[int])
-
-	// Mismatch
-	_, _ = c.Experiment(context.Background(),
-		func(context.Context) (int, error) { return 2, nil },
-		func(context.Context) (int, error) { return 1, nil },
-		feature.Equals[int])
-
-	// Experiment failed
-	_, _ = c.Experiment(context.Background(),
-		func(context.Context) (int, error) { return 0, errors.New("failed") },
-		func(context.Context) (int, error) { return 1, nil },
-		feature.Equals[int])
-
-	// Control failed
-	_, _ = c.Experiment(context.Background(),
-		func(context.Context) (int, error) { return 2, nil },
-		func(context.Context) (int, error) { return 0, errors.New("failed") },
-		feature.Equals[int])
-
-	// Experiment panicked
-	_, _ = c.Experiment(context.Background(),
-		func(context.Context) (int, error) { panic("failed") },
-		func(context.Context) (int, error) { return 1, nil },
-		feature.Equals[int])
-
-	// Control panicked
-	_, _ = c.Experiment(context.Background(),
-		func(context.Context) (int, error) { return 2, nil },
-		func(context.Context) (int, error) { panic("failed") },
-		feature.Equals[int])
-
-	spans := sr.Ended()
-
-	const (
-		numberOfCases = 6
-		spansPerTrace = 3
-	)
-
-	check := func(i int, overall, experimental, control codes.Code) {
-		t.Helper()
-
-		byName := map[string]trace.ReadOnlySpan{}
-		for _, span := range spans[i*spansPerTrace:][:spansPerTrace] {
-			byName[span.Name()] = span
-		}
-
-		if got, want := byName["Experiment"].Status().Code, overall; got != want {
-			t.Errorf("experiment %d: got Status().Code = %q, want %q", i, got, want)
-		}
-
-		assertFeatureAttributes(t, byName["Experiment"].Attributes(), name, true)
-
-		if overall == codes.Ok {
-			assertAttributeBool(t, byName["Experiment"].Attributes(), "feature.experiment.match", overall == codes.Ok)
-		}
-
-		if got, want := byName["Experimental"].Status().Code, experimental; got != want {
-			t.Errorf("experiment %d: got Status().Code = %q, want %q", i, got, want)
-		}
-
-		if got, want := byName["Control"].Status().Code, control; got != want {
-			t.Errorf("experiment %d: got Status().Code = %q, want %q", i, got, want)
-		}
-	}
-
-	if got, want := len(spans), numberOfCases*spansPerTrace; got != want {
-		t.Fatalf("got %d spans, want %d", got, want)
-	}
-
-	// Success
-	check(0, codes.Ok, codes.Ok, codes.Ok)
-
-	// Mismatch
-	check(1, codes.Error, codes.Ok, codes.Ok)
-
-	// Experiment error
-	check(2, codes.Error, codes.Error, codes.Ok)
-
-	// Control error
-	check(3, codes.Error, codes.Ok, codes.Error)
-
-	// Experiment panic
-	check(4, codes.Error, codes.Error, codes.Ok)
-
-	// Control panic
-	check(5, codes.Error, codes.Ok, codes.Error)
-}
-
 func ExampleCase_Run() {
 	optimizationCase := feature.NewCase[Post](
 		"optimize-posts-loading",
@@ -646,57 +626,34 @@ func TestCase_Run(t *testing.T) {
 	}
 }
 
-func TestCase_Run_Tracing(t *testing.T) {
-	var set feature.Set
+func TestCase_Run_Panic(t *testing.T) {
+	run := func(name string, want int, wantErr error, enabled, disabled func() (int, error)) {
+		t.Run(name, func(t *testing.T) {
+			var set feature.Set
 
-	sr := tracetest.NewSpanRecorder()
-	provider := trace.NewTracerProvider(trace.WithSpanProcessor(sr))
+			ctx := context.Background()
 
-	set.SetTracerProvider(provider)
+			c := feature.RegisterCase[int](&set, "case", "", nil, feature.DefaultDisabled)
 
-	ctx := context.Background()
-
-	const name = "case name"
-
-	c := feature.RegisterCase[int](&set, name, "", nil, feature.DefaultDisabled)
-
-	for _, strategy := range []feature.Decision{feature.Disabled, feature.Enabled} {
-		set.SetStrategy(strategy)
-
-		_, _ = c.Run(ctx,
-			func(ctx context.Context) (int, error) { return 2, nil },
-			func(ctx context.Context) (int, error) { return 1, nil })
-
-		_, _ = c.Run(ctx,
-			func(ctx context.Context) (int, error) { return 2, errors.New("error 2") },
-			func(ctx context.Context) (int, error) { return 1, errors.New("error 1") })
+			n, err := c.Run(ctx,
+				func(ctx context.Context) (int, error) { return enabled() },
+				func(ctx context.Context) (int, error) { return disabled() })
+			assertError(t, wantErr, err)
+			if n != want {
+				t.Errorf("got n = %d, want %d", n, want)
+			}
+		})
 	}
 
-	spans := sr.Ended()
+	errFailed := errors.New("failed")
 
-	checkSpan := func(i int, enabled bool, code codes.Code) {
-		span := spans[i]
+	run("Old panic", 0, errFailed,
+		func() (int, error) { return 2, nil },
+		func() (int, error) { panic(errFailed) })
 
-		if got, want := span.Name(), "Run"; got != want {
-			t.Errorf("got spans[%d].Name() = %q, want %q", i, got, want)
-		}
-
-		if got, want := span.Status().Code, code; got != want {
-			t.Errorf("got spans[%d].Status().Code = %q, want %q", i, got, want)
-		}
-
-		assertFeatureAttributes(t, span.Attributes(), name, enabled)
-	}
-
-	if got, want := len(spans), 4; got != want {
-		t.Fatalf("got %d spans, want %d", got, want)
-	}
-
-	checkSpan(0, false, codes.Ok)
-	checkSpan(1, false, codes.Error)
-
-	checkSpan(2, true, codes.Ok)
-	checkSpan(3, true, codes.Error)
+	run("New panic", 1, nil,
+		func() (int, error) { panic(errFailed) },
+		func() (int, error) { return 1, nil })
 }
 
 func TestCompare(t *testing.T) {
@@ -862,53 +819,6 @@ func TestStrategyMap_Enabled(t *testing.T) {
 	assertDecision(t, s, "Rob", feature.Enabled)
 }
 
-func assertAttributeBool(tb testing.TB, attrs []attribute.KeyValue, name string, want bool) {
-	tb.Helper()
-
-	for _, attr := range attrs {
-		if string(attr.Key) != name {
-			continue
-		}
-
-		if !attr.Valid() {
-			tb.Errorf("attribute %q is invalid", attr.Key)
-		}
-
-		if got := attr.Value.AsBool(); got != want {
-			tb.Errorf("got value %t for attribute %q, want %t", got, attr.Key, want)
-		}
-
-		return
-	}
-
-	tb.Errorf("attribute %q not found", name)
-}
-
-func assertFeatureAttributes(tb testing.TB, attrs []attribute.KeyValue, name string, enabled bool) {
-	tb.Helper()
-
-	if got, want := len(attrs), 2; got < want {
-		tb.Errorf("got %d attributes for experiment/run span, want at least %d", got, want)
-	}
-
-	for _, attr := range attrs {
-		if !attr.Valid() {
-			tb.Errorf("attribute %q of experiment/run span is invalid", attr.Key)
-		}
-
-		switch attr.Key {
-		case "feature.enabled":
-			if got, want := attr.Value.AsBool(), enabled; got != want {
-				tb.Errorf("got attribute value %t for attribute %q, want %t", got, attr.Key, want)
-			}
-		case "feature.name":
-			if got, want := attr.Value.AsString(), name; got != want {
-				tb.Errorf("got attribute value %q for attribute %q, want %s", got, attr.Key, want)
-			}
-		}
-	}
-}
-
 func assertEnabled(tb testing.TB, f *feature.Flag) {
 	tb.Helper()
 
@@ -930,6 +840,20 @@ func assertDecision(tb testing.TB, s feature.Strategy, name string, want feature
 
 	if got := s.Enabled(context.Background(), name); got != want {
 		tb.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func assertError(tb testing.TB, want, got error) {
+	tb.Helper()
+
+	switch {
+	case want == nil && got == nil:
+	case want == nil && got != nil:
+		tb.Errorf("got error %q, want no error", got)
+	case want != nil && got == nil:
+		tb.Errorf("got no error, want %s", want)
+	case !errors.Is(want, got) && !errors.Is(got, want):
+		tb.Errorf("got error %q, want %q", got, want)
 	}
 }
 

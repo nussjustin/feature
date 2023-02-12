@@ -5,22 +5,6 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
-)
-
-const (
-	tracerName = "github.com/nussjustin/feature"
-)
-
-var (
-	attributeFeatureEnabled  = attribute.Key("feature.enabled")
-	attributeFeatureName     = attribute.Key("feature.name")
-	attributeExperimentMatch = attribute.Key("feature.experiment.match")
-	attributeExperimentPanic = attribute.Key("feature.experiment.panic")
 )
 
 // Decision is an enum of the potential decisions a [Strategy] can make on whether a [Flag] should be enabled or not.
@@ -73,7 +57,7 @@ const (
 // The zero value is usable as is, using the default decision for each flag.
 type Set struct {
 	strategy atomic.Pointer[Strategy]
-	tracer   atomic.Pointer[trace.Tracer]
+	tracer   atomic.Pointer[Tracer]
 
 	mu    sync.Mutex
 	flags map[string]*Flag
@@ -97,33 +81,25 @@ func (s *Set) SetStrategy(strategy Strategy) {
 	}
 }
 
-// SetTracerProvider sets the provider used for creating a tracer for the global [Set].
+// SetTracer sets the [Tracer] used for the global [Set].
 //
-// See [Set.SetTracerProvider] for more information.
-func SetTracerProvider(tp trace.TracerProvider) {
-	globalSet.SetTracerProvider(tp)
+// See [Tracer] for more information.
+func SetTracer(tracer Tracer) {
+	globalSet.SetTracer(tracer)
 }
 
-// SetTracerProvider sets the provider used for creating a tracer.
-func (s *Set) SetTracerProvider(tp trace.TracerProvider) {
-	t := tp.Tracer(tracerName)
-
-	s.tracer.Store(&t)
-}
-
-func (s *Set) getTracer() trace.Tracer {
-	ptr := s.tracer.Load()
-
-	if ptr != nil {
-		return *ptr
-	}
-
-	tracer := otel.GetTracerProvider().Tracer(tracerName)
-
-	// No need for CAW since the tracer is always the same
+// SetTracer sets the [Tracer] used by the [Set].
+//
+// See [Tracer] for more information.
+func (s *Set) SetTracer(tracer Tracer) {
 	s.tracer.Store(&tracer)
+}
 
-	return tracer
+func (s *Set) getTracer() Tracer {
+	if t := s.tracer.Load(); t != nil {
+		return *t
+	}
+	return Tracer{}
 }
 
 func (s *Set) newFlag(name, description string, strategy Strategy, defaultDecision DefaultDecision) *Flag {
@@ -145,14 +121,47 @@ func (s *Set) newFlag(name, description string, strategy Strategy, defaultDecisi
 	return f
 }
 
-// Case can be used to simplify running code paths dynamically based on the whether a feature is enabled.
+// Tracer can be used to trace the use of both [Case] and [Flag] types for example to implement tracing or to collect
+// metrics.
+//
+// See the documentation of the fields for information on what can be traced.
+//
+// All fields are optional.
+//
+// A basic, pre-configured [Tracer] using OpenTelemetry can be found in the otelfeature subpackage.
+type Tracer struct {
+	// Decision is called every time [Flag.Enabled] is called.
+	Decision func(context.Context, *Flag, Decision)
+
+	// Case is called for each called function during [Case.Experiment] as well as for the function called by [Case.Run].
+	//
+	// The returned function is called after the called function has returned with the values returned by the function.
+	//
+	// The returned function can be nil.
+	Case func(context.Context, *Flag, Decision) (context.Context, func(result any, err error))
+
+	// Experiment is called at the beginning of every call to [Case.Experiment].
+	//
+	// The returned function is called after both functions given to [Case.Experiment] have returned and is passed
+	// the [Decision] made by the given [Flag] and the values that will be returned as well as a boolean that indicates
+	// if the experiment was successful (the results were equal and no errors occurred).
+	//
+	// The returned function can be nil.
+	Experiment func(context.Context, *Flag) (context.Context, func(d Decision, result any, err error, success bool))
+
+	// Run is called at the beginning of every call to [Case.Run].
+	//
+	// The returned function is called with the [Decision] made by the given [Flag] as well and the result that will
+	// be returned.
+	//
+	// The returned function can be nil.
+	Run func(context.Context, *Flag) (context.Context, func(d Decision, result any, err error))
+}
+
+// Case can be used to simplify running code paths dynamically based on whether a feature is enabled.
 //
 // Additionally, _experiments_ can be run using the [Case.Experiment] method, which compare the results of two
 // functions, while safely returning the correct value based on the status of the feature.
-//
-// Functions executed via [Case.Run] and experiments run via [Case.Experiment] are traced using spans created
-// via the tracer obtained from the [otel.TracerProvider] set using the [Set.SetTracerProvider] method (or the
-// global [SetTracerProvider] function, if using the global [Set]).
 //
 // See [Flag.Enabled] for an explanation on how a [Case] determines whether to return hew result from the first
 // (feature flag enabled) or second (feature flag disabled) function.
@@ -192,49 +201,45 @@ func Equals[T comparable](a, b T) bool {
 	return a == b
 }
 
-func (c *Case[T]) startSpan(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	return c.flag.set.getTracer().Start(ctx, spanName, opts...)
-}
-
 // PanicError holds the error recovered from one of the called functions when running an experiment.
 type PanicError struct {
-	name string
-
-	// Value is the value recovered from the panic.
-	Value any
+	// Recovered is the value recovered from the panic.
+	Recovered any
 }
 
 var _ error = (*PanicError)(nil)
 
 // Error implements the error interface.
 func (p *PanicError) Error() string {
-	return fmt.Sprintf("%s: caught panic(%v)", p.name, p.Value)
+	return fmt.Sprintf("recovered: %v", p.Recovered)
 }
 
-func (c *Case[T]) run(ctx context.Context, name string, f func(context.Context) (T, error)) (t T, err error) {
-	ctx, span := c.startSpan(ctx, name, trace.WithSpanKind(trace.SpanKindInternal))
-	defer span.End()
+// Unwrap returns Recovered if Recovered is an error or nil otherwise.
+func (p *PanicError) Unwrap() error {
+	if err, ok := p.Recovered.(error); ok {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Case[T]) run(ctx context.Context, d Decision, f func(context.Context) (T, error)) (result T, err error) {
+	if t := c.flag.set.getTracer(); t.Case != nil {
+		var done func(any, error)
+		ctx, done = t.Case(ctx, c.flag, d)
+
+		if done != nil {
+			defer func() { done(result, err) }()
+		}
+	}
 
 	defer func() {
-		var panicked bool
-
 		if v := recover(); v != nil {
-			panicked = true
-			err = &PanicError{name: name, Value: v}
-		}
-
-		span.SetAttributes(attributeExperimentPanic.Bool(panicked))
-
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-		} else {
-			span.SetStatus(codes.Ok, "")
+			err = &PanicError{Recovered: v}
 		}
 	}()
 
-	t, err = f(ctx)
-	return
+	return f(ctx)
 }
 
 // Experiment runs both an experimental and a control function concurrently and compares their results using equals.
@@ -245,6 +250,8 @@ func (c *Case[T]) run(ctx context.Context, name string, f func(context.Context) 
 // When a function panics the panic is caught and converted into an error that is or wraps a [PanicError] and treated
 // like a normal error.
 //
+// The given equals function is only called if there was no error.
+//
 // When using values of a type that is comparable using ==, the global function [Equals] can be used to create the
 // comparison function.
 func (c *Case[T]) Experiment(ctx context.Context,
@@ -252,15 +259,13 @@ func (c *Case[T]) Experiment(ctx context.Context,
 	control func(context.Context) (T, error),
 	equals func(new, old T) bool,
 ) (T, error) {
-	ctx, span := c.startSpan(ctx, "Experiment", trace.WithSpanKind(trace.SpanKindInternal))
-	defer span.End()
+	var done func(d Decision, result any, err error, success bool)
+	if t := c.flag.set.getTracer(); t.Experiment != nil {
+		ctx, done = t.Experiment(ctx, c.flag)
+	}
 
 	// Check status before while the experiment runs. This can save some time if the used Strategy is slow.
 	isEnabled := c.flag.Enabled(ctx)
-
-	span.SetAttributes(
-		attributeFeatureEnabled.Bool(isEnabled),
-		attributeFeatureName.String(c.flag.name))
 
 	var wg sync.WaitGroup
 	var (
@@ -274,65 +279,34 @@ func (c *Case[T]) Experiment(ctx context.Context,
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		experimentT, experimentErr = c.run(ctx, "Experimental", experimental)
+		experimentT, experimentErr = c.run(ctx, Enabled, experimental)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		controlT, controlErr = c.run(ctx, "Control", control)
+		controlT, controlErr = c.run(ctx, Disabled, control)
 	}()
 
 	wg.Wait()
 
-	handleExperimentResult(span, experimentT, experimentErr, controlT, controlErr, isEnabled, equals)
+	var result T
+	var err error
 
 	if isEnabled {
-		return experimentT, experimentErr
+		result, err = experimentT, experimentErr
+	} else {
+		result, err = controlT, controlErr
 	}
 
-	return controlT, controlErr
-}
+	// Always compare, even if we don't use the result (done is nil).
+	ok := controlErr == nil && experimentErr == nil && equals(experimentT, controlT)
 
-func handleExperimentResult[T any](
-	span trace.Span,
-
-	experimentT T,
-	experimentErr error,
-
-	controlT T,
-	controlErr error,
-
-	isEnabled bool,
-
-	equals func(new T, old T) bool,
-) {
-	switch {
-	// If both failed, the whole operation failed
-	case experimentErr != nil && controlErr != nil:
-		span.SetStatus(codes.Error, "control and experiment failed")
-
-	// If the active (enabled) path failed, we make sure to explicitly state this.
-	case experimentErr != nil && isEnabled:
-		span.SetStatus(codes.Error, "active code path (experiment) failed")
-	case controlErr != nil && !isEnabled:
-		span.SetStatus(codes.Error, "active code path (control) failed")
-
-	// Otherwise on error we explicitly state that only the inactive path failed.
-	case experimentErr != nil:
-		span.SetStatus(codes.Error, "inactive code path (experiment) failed")
-	case controlErr != nil:
-		span.SetStatus(codes.Error, "inactive code path (experiment) failed")
-
-	// If there was no error we can finally compare the results
-	case !equals(experimentT, controlT):
-		span.SetAttributes(attributeExperimentMatch.Bool(false))
-		span.SetStatus(codes.Error, "result mismatch")
-
-	default:
-		span.SetAttributes(attributeExperimentMatch.Bool(true))
-		span.SetStatus(codes.Ok, "")
+	if done != nil {
+		done(If(isEnabled), result, err, ok)
 	}
+
+	return result, err
 }
 
 // Run checks if the associated flag is enabled and runs either ifEnabled or ifDisabled and returns their result.
@@ -340,29 +314,22 @@ func (c *Case[T]) Run(ctx context.Context,
 	ifEnabled func(context.Context) (T, error),
 	ifDisabled func(context.Context) (T, error),
 ) (T, error) {
-	ctx, span := c.startSpan(ctx, "Run", trace.WithSpanKind(trace.SpanKindInternal))
-	defer span.End()
+	var done func(Decision, any, error)
+	if t := c.flag.set.getTracer(); t.Run != nil {
+		ctx, done = t.Run(ctx, c.flag)
+	}
 
 	enabled := c.flag.Enabled(ctx)
 
-	span.SetAttributes(
-		attributeFeatureEnabled.Bool(enabled),
-		attributeFeatureName.String(c.flag.name))
-
-	var resultT T
-	var err error
-
+	fn := ifDisabled
 	if enabled {
-		resultT, err = ifEnabled(ctx)
-	} else {
-		resultT, err = ifDisabled(ctx)
+		fn = ifEnabled
 	}
 
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-	} else {
-		span.SetStatus(codes.Ok, "")
+	resultT, err := c.run(ctx, If(enabled), fn)
+
+	if done != nil {
+		done(If(enabled), resultT, err)
 	}
 
 	return resultT, err
@@ -402,6 +369,12 @@ func RegisterFlag(set *Set, name string, description string, strategy Strategy, 
 	return set.newFlag(name, description, strategy, defaultDecision)
 }
 
+func (f *Flag) trace(ctx context.Context, d Decision) {
+	if t := f.set.getTracer(); t.Decision != nil {
+		t.Decision(ctx, f, d)
+	}
+}
+
 // Enabled returns true if the feature is enabled for the given context.
 //
 // The status of the flag is determined as follows:
@@ -423,17 +396,22 @@ func RegisterFlag(set *Set, name string, description string, strategy Strategy, 
 func (f *Flag) Enabled(ctx context.Context) bool {
 	if f.strategy != nil {
 		if d := f.strategy.Enabled(ctx, f.name); d != Default {
+			f.trace(ctx, d)
 			return d == Enabled
 		}
 	}
 
 	if s := f.set.strategy.Load(); s != nil {
 		if d := (*s).Enabled(ctx, f.name); d != Default {
+			f.trace(ctx, d)
 			return d == Enabled
 		}
 	}
 
-	return Decision(f.defaultDecision) == Enabled
+	d := Decision(f.defaultDecision)
+
+	f.trace(ctx, d)
+	return d == Enabled
 }
 
 // Name returns the name passed to [NewFlag] or [RegisterFlag].

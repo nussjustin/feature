@@ -2,16 +2,7 @@
 
 Package feature provides a simple, easy to use abstraction for working with feature flags in Go.
 
-## OpenTelemetry integration
-
-Package feature has integrated support for tracing via [OpenTelemetry](https://opentelemetry.io/) when using
-[Case](http://localhost:8080/github.com/nussjustin/feature#Case)s for gating logic or running experiments.
-
-In order for spans to be collected use the global
-[SetTracerProvider](https://pkg.go.dev/github.com/nussjustin/feature#SetTracerProvider) function or the per-Set
-[Set.SetTracerProvider](https://pkg.go.dev/github.com/nussjustin/feature#Set.SetTracerProvider) function.
-
-## Example
+## Examples
 
 ### Defining and checking a flag
 
@@ -31,12 +22,11 @@ method which returns either `true` or `false`.
 
 ```go
 var tmpl *template.Template
-var err error
 
 if newUIFlag.Enabled(ctx) {
-    tmpl, err = template.Parse("new-ui/*.gotmpl"))
+    tmpl = template.Must(template.Parse("new-ui/*.gotmpl")))
 } else {
-    tmpl, err = template.Parse("old-ui/*.gotmpl"))
+    tmpl = template.Must(template.Parse("old-ui/*.gotmpl")))
 }
 ```
 
@@ -47,8 +37,8 @@ A common use case for flags is switching between code paths, for example using a
 Instead of manually checking the flag state, a [Case](https://pkg.go.dev/github.com/nussjustin/feature#Case) can be used
 to abstract the switch.
 
-In addition to abstracting the condition, a `Case` will automatically create OpenTelemetry spans which can be used to
-more easily observe the effect of switching code paths without having to write custom instrumentation.
+In addition to abstracting the condition, a `Case` also makes it possible to trace the decision making and results of
+the called function.
 
 There are 2 ways to obtain a `Case`:
 
@@ -88,9 +78,9 @@ Note that in this case the underlying `Flag` is completely hidden and can not be
 ### Running an experiment
 
 In addition to simply switching between two functions, a `Case` can also be used to run two functions and compare their
-result using a custom comparator function.
+result using a custom comparison function.
 
-Any errors or mismatches will automatically be instrumented as part of the OpenTelemetry trace.
+Both result of the experiment and the result of the comparison can be traced using the built in tracing functionality.
 
 Example:
 
@@ -259,6 +249,44 @@ When checking if a feature flag is enabled, first the `Strategy` associated with
 If the `Strategy` is nil or the result is `Default`, the `Strategy` associated with the set is used.
 
 If this is also nil or the result is also `Default`, the `DefaultDecision` of the `Flag/`/`Case` is used.
+
+## Tracing
+
+It is possible to trace the use `Flag`s and `Case`s using the
+[Tracer](https://pkg.go.dev/github.com/nussjustin/feature#Tracer) type.
+
+In order to trace the use of this package simply use the global
+[SetStrategy](https://pkg.go.dev/github.com/nussjustin/feature#SetStrategy) function to register a `Tracer`:
+
+```go
+func main() {
+    feature.SetTracer(myTracer)
+}
+```
+
+Or when using a custom `Set`:
+
+```go
+func main() {
+    mySet.SetTracer(myCustomStrategy)
+}
+```
+
+### OpenTelemetry integration
+
+The `otelfeature` package found at
+[github.com/nussjustin/feature/otelfeature](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature) exposes a
+function that returns pre-configured `Tracer` that implements basic tracing of `Case`s using
+[OpenTelemetry](https://opentelemetry.io/).
+
+In order to use this just pass the result of
+[otelfeature.Tracer](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature#Tracer) to `SetStrategy`:
+
+```go
+func main() {
+    feature.SetTracer(otelfeature.Tracer(nil))
+}
+```
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
