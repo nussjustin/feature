@@ -67,13 +67,23 @@ var globalSet Set
 
 // SetStrategy sets or removes the [Strategy] for the global [Set].
 //
+// If more than one non-nil [Strategy] is given they will be checked in the order given, using the first non-[Default]
+// decision as the final result.
+//
 // See [Set.SetStrategy] for more information.
-func SetStrategy(strategy Strategy) {
-	globalSet.SetStrategy(strategy)
+func SetStrategy(strategy Strategy, others ...Strategy) {
+	globalSet.SetStrategy(strategy, others...)
 }
 
 // SetStrategy sets or removes the [Strategy] used by s to make decisions.
-func (s *Set) SetStrategy(strategy Strategy) {
+//
+// If more than one non-nil [Strategy] is given they will be checked in the order given, using the first non-[Default]
+// decision as the final result.
+func (s *Set) SetStrategy(strategy Strategy, others ...Strategy) {
+	if len(others) > 0 {
+		strategy = chainStrategies(append([]Strategy{strategy}, others...))
+	}
+
 	if strategy == nil {
 		s.strategy.Store(nil)
 	} else {
@@ -439,6 +449,33 @@ func (f *Flag) Description() string {
 type Strategy interface {
 	// Enabled takes the name of a feature flag and returns a Decision that determines if the flag should be enabled.
 	Enabled(ctx context.Context, name string) Decision
+}
+
+type chainStrategy []Strategy
+
+func (c chainStrategy) Enabled(ctx context.Context, name string) Decision {
+	for _, s := range c {
+		if d := s.Enabled(ctx, name); d != Default {
+			return d
+		}
+	}
+	return Default
+}
+
+func chainStrategies(strategies []Strategy) Strategy {
+	chain := make([]Strategy, 0, len(strategies))
+
+	for _, strategy := range strategies {
+		if strategy != nil {
+			chain = append(chain, strategy)
+		}
+	}
+
+	if len(chain) == 0 {
+		return nil
+	}
+
+	return chainStrategy(chain)
 }
 
 // StrategyFunc implements a [Strategy] by calling itself.

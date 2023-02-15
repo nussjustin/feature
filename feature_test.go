@@ -72,21 +72,38 @@ func TestSetStrategy(t *testing.T) {
 	mixedFlag := feature.NewFlag("TestSetStrategy/Mixed", "", nil, feature.DefaultDisabled)
 	upperFlag := feature.NewFlag("TestSetStrategy/UPPER", "", nil, feature.DefaultDisabled)
 
+	// Test initial setting
 	assertDisabled(t, lowerFlag)
 	assertDisabled(t, mixedFlag)
 	assertDisabled(t, upperFlag)
 
+	// Set setting first strategy
 	feature.SetStrategy(lower)
 
 	assertEnabled(t, lowerFlag)
 	assertDisabled(t, mixedFlag)
 	assertDisabled(t, upperFlag)
 
+	// Test changing from already set strategy
 	feature.SetStrategy(upper)
 
 	assertDisabled(t, lowerFlag)
 	assertDisabled(t, mixedFlag)
 	assertEnabled(t, upperFlag)
+
+	// Test multiple
+	feature.SetStrategy(feature.Default, upper, lower)
+
+	assertDisabled(t, lowerFlag)
+	assertDisabled(t, mixedFlag)
+	assertEnabled(t, upperFlag)
+
+	// Test that nil is ignored
+	feature.SetStrategy(nil, lower)
+
+	assertEnabled(t, lowerFlag)
+	assertDisabled(t, mixedFlag)
+	assertDisabled(t, upperFlag)
 }
 
 func TestSetTracer(t *testing.T) {
