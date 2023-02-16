@@ -274,17 +274,24 @@ func main() {
 
 ### OpenTelemetry integration
 
+# TODO: Document metrics
+
 The `otelfeature` package found at
 [github.com/nussjustin/feature/otelfeature](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature) exposes a
-function that returns pre-configured `Tracer` that implements basic tracing of `Case`s using
+function that returns pre-configured `Tracer` that implements basic metrics and tracing for `Flag`s and `Case`s using
 [OpenTelemetry](https://opentelemetry.io/).
 
-In order to use this just pass the result of
-[otelfeature.Tracer](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature#Tracer) to `SetStrategy`:
+In order to enable metrics collection and tracing use the global
+[otelfeature.Tracer](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature#Tracer) function to create a new
+`feature.Tracer` that can be passed to either the global `SetTracer` function or the `Set.SetStrategy` method.
 
 ```go
 func main() {
-    feature.SetTracer(otelfeature.Tracer(nil))
+    tracer, err := otelfeature.Tracer(nil)
+    if err != nil {
+        // Handle the error
+    }
+    feature.SetTracer(tracer)
 }
 ```
 

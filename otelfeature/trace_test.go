@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
-func TestTracer(t *testing.T) {
+func TestTracer_Tracing(t *testing.T) {
 	t.Run("Decision", func(t *testing.T) {
 		t.Run("Enabled", func(t *testing.T) {
 			flag := feature.RegisterFlag(
@@ -26,7 +26,7 @@ func TestTracer(t *testing.T) {
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
-			tracer := otelfeature.Tracer(provider)
+			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
 			ctx, span := provider.Tracer("").Start(context.Background(), "test")
 			tracer.Decision(ctx, flag, feature.Enabled)
@@ -48,7 +48,7 @@ func TestTracer(t *testing.T) {
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
-			tracer := otelfeature.Tracer(provider)
+			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
 			ctx, span := provider.Tracer("").Start(context.Background(), "test")
 			tracer.Decision(ctx, flag, feature.Disabled)
@@ -72,7 +72,7 @@ func TestTracer(t *testing.T) {
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
-			tracer := otelfeature.Tracer(provider)
+			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
 			_, done := tracer.Case(context.Background(), flag, feature.Enabled)
 			done(nil, nil)
@@ -94,7 +94,7 @@ func TestTracer(t *testing.T) {
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
-			tracer := otelfeature.Tracer(provider)
+			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
 			_, done := tracer.Case(context.Background(), flag, feature.Disabled)
 			done(nil, errors.New("some error"))
@@ -117,7 +117,7 @@ func TestTracer(t *testing.T) {
 
 		spanRecorder := tracetest.NewSpanRecorder()
 		provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
-		tracer := otelfeature.Tracer(provider)
+		tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
 		ctx, span := provider.Tracer("").Start(context.Background(), "test")
 		tracer.CasePanicked(ctx, flag, feature.Enabled, &feature.PanicError{
@@ -141,7 +141,7 @@ func TestTracer(t *testing.T) {
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
-			tracer := otelfeature.Tracer(provider)
+			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
 			_, done := tracer.Experiment(context.Background(), flag)
 			done(feature.Enabled, nil, nil, true)
@@ -164,7 +164,7 @@ func TestTracer(t *testing.T) {
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
-			tracer := otelfeature.Tracer(provider)
+			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
 			_, done := tracer.Experiment(context.Background(), flag)
 			done(feature.Enabled, nil, errors.New("failed"), false)
@@ -189,7 +189,7 @@ func TestTracer(t *testing.T) {
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
-			tracer := otelfeature.Tracer(provider)
+			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
 			_, done := tracer.Run(context.Background(), flag)
 			done(feature.Enabled, nil, nil)
@@ -211,7 +211,7 @@ func TestTracer(t *testing.T) {
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
-			tracer := otelfeature.Tracer(provider)
+			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
 			_, done := tracer.Run(context.Background(), flag)
 			done(feature.Enabled, nil, errors.New("failed"))
@@ -222,10 +222,6 @@ func TestTracer(t *testing.T) {
 			assertSpanError(t, recordedSpan, "failed")
 		})
 	})
-}
-
-func ExampleTracer() {
-	feature.SetTracer(otelfeature.Tracer(nil))
 }
 
 func assertAttributeBool(tb testing.TB, attrs []attribute.KeyValue, key attribute.Key, want bool) {
@@ -270,7 +266,6 @@ func getAttributeOfType(tb testing.TB, attrs []attribute.KeyValue, key attribute
 
 	if value.Type() != type_ {
 		tb.Fatalf("attribute %s has wrong type: %s", key, value.Type())
-
 	}
 	return value
 }

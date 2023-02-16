@@ -6,46 +6,28 @@ import (
 
 	"github.com/nussjustin/feature"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
-const (
-	tracerName = "github.com/nussjustin/feature/otelfeature"
-)
-
-var (
-	// AttributeFeatureEnabled is true if a flag was enabled or if running the experimental case in an Experiment.
-	AttributeFeatureEnabled = attribute.Key("feature.enabled")
-
-	// AttributeFeatureName contains the name of the used feature flag.
-	AttributeFeatureName = attribute.Key("feature.name")
-
-	// AttributeExperimentSuccess is true if an experiment ran with not errors and the results are considered equal.
-	AttributeExperimentSuccess = attribute.Key("feature.experiment.success")
-
-	// AttributeRecoveredValue contains the recovered value from a panic converted into a string using fmt.Sprint.
-	AttributeRecoveredValue = attribute.Key("feature.case.recovered")
-)
-
-func Tracer(tp trace.TracerProvider) feature.Tracer {
-	if tp == nil {
-		tp = otel.GetTracerProvider()
+func newTraceTracer(opts *Opts) feature.Tracer {
+	provider := otel.GetTracerProvider()
+	if opts != nil && opts.TracerProvider != nil {
+		provider = opts.TracerProvider
 	}
 
-	tracer := tp.Tracer(tracerName)
+	tracer := provider.Tracer(namespace, trace.WithInstrumentationVersion(version))
 
 	return feature.Tracer{
-		Decision:     createDecisionCallback(),
-		Case:         createCaseCallback(tracer),
-		CasePanicked: createCasePanickedCallback(),
-		Experiment:   createExperimentCallback(tracer),
-		Run:          createRunCallback(tracer),
+		Decision:     createTraceDecisionCallback(),
+		Case:         createTraceCaseCallback(tracer),
+		CasePanicked: createTraceCasePanickedCallback(),
+		Experiment:   createTraceExperimentCallback(tracer),
+		Run:          createTraceRunCallback(tracer),
 	}
 }
 
-func createDecisionCallback() func(context.Context, *feature.Flag, feature.Decision) {
+func createTraceDecisionCallback() func(context.Context, *feature.Flag, feature.Decision) {
 	return func(ctx context.Context, flag *feature.Flag, decision feature.Decision) {
 		span := trace.SpanFromContext(ctx)
 		span.AddEvent("decision", trace.WithAttributes(
@@ -54,7 +36,7 @@ func createDecisionCallback() func(context.Context, *feature.Flag, feature.Decis
 	}
 }
 
-func createCaseCallback(t trace.Tracer) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(result any, err error)) {
+func createTraceCaseCallback(t trace.Tracer) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(result any, err error)) {
 	return func(ctx context.Context, flag *feature.Flag, decision feature.Decision) (context.Context, func(result any, err error)) {
 		ctx, span := t.Start(ctx, nameFromDecision(decision),
 			trace.WithAttributes(
@@ -73,7 +55,7 @@ func createCaseCallback(t trace.Tracer) func(context.Context, *feature.Flag, fea
 	}
 }
 
-func createCasePanickedCallback() func(context.Context, *feature.Flag, feature.Decision, *feature.PanicError) {
+func createTraceCasePanickedCallback() func(context.Context, *feature.Flag, feature.Decision, *feature.PanicError) {
 	return func(ctx context.Context, flag *feature.Flag, decision feature.Decision, err *feature.PanicError) {
 		span := trace.SpanFromContext(ctx)
 
@@ -86,7 +68,7 @@ func createCasePanickedCallback() func(context.Context, *feature.Flag, feature.D
 	}
 }
 
-func createExperimentCallback(t trace.Tracer) func(context.Context, *feature.Flag) (context.Context, func(d feature.Decision, result any, err error, success bool)) {
+func createTraceExperimentCallback(t trace.Tracer) func(context.Context, *feature.Flag) (context.Context, func(d feature.Decision, result any, err error, success bool)) {
 	return func(ctx context.Context, flag *feature.Flag) (context.Context, func(d feature.Decision, result any, err error, success bool)) {
 		ctx, span := t.Start(ctx, flag.Name(),
 			trace.WithAttributes(AttributeFeatureName.String(flag.Name())))
@@ -107,7 +89,7 @@ func createExperimentCallback(t trace.Tracer) func(context.Context, *feature.Fla
 	}
 }
 
-func createRunCallback(t trace.Tracer) func(context.Context, *feature.Flag) (context.Context, func(d feature.Decision, result any, err error)) {
+func createTraceRunCallback(t trace.Tracer) func(context.Context, *feature.Flag) (context.Context, func(d feature.Decision, result any, err error)) {
 	return func(ctx context.Context, flag *feature.Flag) (context.Context, func(d feature.Decision, result any, err error)) {
 		ctx, span := t.Start(ctx, flag.Name(),
 			trace.WithAttributes(AttributeFeatureName.String(flag.Name())))
