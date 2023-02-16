@@ -7,8 +7,7 @@ import (
 )
 
 // For use in examples
-type Post struct {
-}
+type Post struct{}
 
 // For use in examples
 var myCtx = context.Background()

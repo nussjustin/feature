@@ -249,7 +249,6 @@ func ExampleCase_Experiment() {
 		func(ctx context.Context) (Post, error) { return loadPostOptimized(ctx, postId) },
 		func(ctx context.Context) (Post, error) { return loadPost(ctx, postId) },
 		feature.Equals[Post])
-
 	if err != nil {
 		panic(err)
 	}
@@ -560,7 +559,6 @@ func ExampleCase_Run() {
 	post, err := optimizationCase.Run(myCtx,
 		func(ctx context.Context) (Post, error) { return loadPostOptimized(ctx, postId) },
 		func(ctx context.Context) (Post, error) { return loadPost(ctx, postId) })
-
 	if err != nil {
 		panic(err)
 	}
