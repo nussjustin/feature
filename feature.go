@@ -389,13 +389,10 @@ func (f *Flag) trace(ctx context.Context, d Decision) {
 //
 // The status of the flag is determined as follows:
 //
-//  1. The [Strategy] of the [Flag] is checked. If no [Strategy] is set on the [Flag] or the [Strategy] returns
+//  1. The [Strategy] of the associated [Set] is checked. If no [Strategy] is set on the [Set] or the [Strategy] returns
 //     [NoDecision], Enabled will continue to the next step.
 //
-//  2. The [Strategy] of the associated [Set] is checked. If no [Strategy] is set on the [Set] or the [Strategy] returns
-//     [NoDecision], Enabled will continue to the next step.
-//
-//  3. If the previous steps did not result in a final decision ([Enabled] or [Disabled]), the [DefaultDecision] of the
+//  2. If the previous steps did not result in a final decision ([Enabled] or [Disabled]), the [DefaultDecision] of the
 //     flag is used.
 //
 // Example:
