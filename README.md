@@ -14,7 +14,7 @@ Both functions take a name for the flag, and optional description, an optional
 and a default _decision_ (whether the feature should be enabled or disabled).
 
 ```go
-var newUIFlag = feature.NewFlag("new-ui", "enables the new UI", nil, feature.DefaultDisabled)
+var newUIFlag = feature.NewFlag("new-ui", "enables the new UI", feature.DefaultDisabled)
 ```
 
 The status of the flag can be checked via the [Enabled](https://pkg.go.dev/github.com/nussjustin/feature#Flag.Enabled)
@@ -49,7 +49,7 @@ from an existing feature flag like this:
 
 ```go
 var newUICase = feature.CaseFor[*template.Template](
-	feature.NewFlag("new-ui", "enables the new UI", nil, feature.DefaultDisabled),
+	feature.NewFlag("new-ui", "enables the new UI", feature.DefaultDisabled),
 )
 ```
 
@@ -70,7 +70,7 @@ The functions [NewCase](https://pkg.go.dev/github.com/nussjustin/feature#NewCase
 The previous example thus could also be written as
 
 ```go
-var newUICase = feature.NewCase[*template.Template]("new-ui", "enables the new UI", nil, feature.DefaultDisabled)
+var newUICase = feature.NewCase[*template.Template]("new-ui", "enables the new UI", feature.DefaultDisabled)
 ```
 
 Note that in this case the underlying `Flag` is completely hidden and can not be accessed directly.

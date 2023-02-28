@@ -16,7 +16,7 @@ func TestCase_Experiment_Tracing(t *testing.T) {
 
 			set.SetTracer(tracerCallback(t))
 
-			c := feature.RegisterCase[int](&set, "some case", "", nil, feature.DefaultEnabled)
+			c := feature.RegisterCase[int](&set, "some case", "", feature.DefaultEnabled)
 
 			_, _ = c.Experiment(context.Background(),
 				func(context.Context) (int, error) { return enabled() },
@@ -94,7 +94,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		var set feature.Set
 
-		c := feature.RegisterCase[int](&set, "case name", "", nil, feature.DefaultDisabled)
+		c := feature.RegisterCase[int](&set, "case name", "", feature.DefaultDisabled)
 
 		set.SetStrategy(feature.Enabled)
 		set.SetTracer(feature.Tracer{
@@ -112,7 +112,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Error", func(t *testing.T) {
 		var set feature.Set
 
-		c := feature.RegisterCase[int](&set, "case name", "", nil, feature.DefaultDisabled)
+		c := feature.RegisterCase[int](&set, "case name", "", feature.DefaultDisabled)
 
 		err1, err2 := errors.New("error 1"), errors.New("error 2")
 
@@ -132,7 +132,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Panic", func(t *testing.T) {
 		var set feature.Set
 
-		c := feature.RegisterCase[int](&set, "case name", "", nil, feature.DefaultDisabled)
+		c := feature.RegisterCase[int](&set, "case name", "", feature.DefaultDisabled)
 
 		err := errors.New("error 1")
 
@@ -154,12 +154,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 func TestFlag_Enabled_Tracing(t *testing.T) {
 	var set feature.Set
 
-	flagStrategyDecision := feature.Default
-	flagStrategy := feature.StrategyFunc(func(context.Context, string) feature.Decision {
-		return flagStrategyDecision
-	})
-
-	flag := feature.RegisterFlag(&set, "", "", flagStrategy, feature.DefaultDisabled)
+	flag := feature.RegisterFlag(&set, "", "", feature.DefaultDisabled)
 
 	// Default decision
 	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, feature.Disabled)})
@@ -170,12 +165,6 @@ func TestFlag_Enabled_Tracing(t *testing.T) {
 	// Set strategy decision
 	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, feature.Enabled)})
 	assertEnabled(t, flag)
-
-	flagStrategyDecision = feature.Disabled
-
-	// Flag strategy decision
-	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, feature.Disabled)})
-	assertDisabled(t, flag)
 }
 
 func assertCalled(tb testing.TB, name string) func() {

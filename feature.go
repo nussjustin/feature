@@ -138,8 +138,8 @@ func (s *Set) Flags() []*Flag {
 	return fs
 }
 
-func (s *Set) newFlag(name, description string, strategy Strategy, defaultDecision DefaultDecision) *Flag {
-	f := &Flag{set: s, name: name, description: description, strategy: strategy, defaultDecision: defaultDecision}
+func (s *Set) newFlag(name, description string, defaultDecision DefaultDecision) *Flag {
+	f := &Flag{set: s, name: name, description: description, defaultDecision: defaultDecision}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -220,8 +220,8 @@ func CaseFor[T any](f *Flag) *Case[T] {
 // NewCase registers and returns a new [Case] with the global [Set].
 //
 // See [RegisterCase] for more details.
-func NewCase[T any](name string, description string, strategy Strategy, defaultDecision DefaultDecision) *Case[T] {
-	return RegisterCase[T](&globalSet, name, description, strategy, defaultDecision)
+func NewCase[T any](name string, description string, defaultDecision DefaultDecision) *Case[T] {
+	return RegisterCase[T](&globalSet, name, description, defaultDecision)
 }
 
 // RegisterCase registers and returns a new [Flag] with the given [Set].
@@ -229,8 +229,8 @@ func NewCase[T any](name string, description string, strategy Strategy, defaultD
 // A nil [Strategy] is equivalent to passing [Default].
 //
 // If the given name is already is use by another case or flag, RegisterCase will panic.
-func RegisterCase[T any](set *Set, name string, description string, strategy Strategy, defaultDecision DefaultDecision) *Case[T] {
-	return CaseFor[T](RegisterFlag(set, name, description, strategy, defaultDecision))
+func RegisterCase[T any](set *Set, name string, description string, defaultDecision DefaultDecision) *Case[T] {
+	return CaseFor[T](RegisterFlag(set, name, description, defaultDecision))
 }
 
 // Equals returns a function that compares to values of the same type using ==.
@@ -394,15 +394,14 @@ type Flag struct {
 
 	name            string
 	description     string
-	strategy        Strategy
 	defaultDecision DefaultDecision
 }
 
 // NewFlag registers and returns a new [Flag] with the global [Set].
 //
 // See [RegisterFlag] for more details.
-func NewFlag(name string, description string, strategy Strategy, defaultDecision DefaultDecision) *Flag {
-	return RegisterFlag(&globalSet, name, description, strategy, defaultDecision)
+func NewFlag(name string, description string, defaultDecision DefaultDecision) *Flag {
+	return RegisterFlag(&globalSet, name, description, defaultDecision)
 }
 
 // RegisterFlag registers and returns a new [Flag] with the given [Set].
@@ -410,8 +409,8 @@ func NewFlag(name string, description string, strategy Strategy, defaultDecision
 // A nil [Strategy] is equivalent to passing [Default].
 //
 // If the given name is already is use by another case or flag, RegisterFlag will panic.
-func RegisterFlag(set *Set, name string, description string, strategy Strategy, defaultDecision DefaultDecision) *Flag {
-	return set.newFlag(name, description, strategy, defaultDecision)
+func RegisterFlag(set *Set, name string, description string, defaultDecision DefaultDecision) *Flag {
+	return set.newFlag(name, description, defaultDecision)
 }
 
 func (f *Flag) trace(ctx context.Context, d Decision) {
@@ -439,13 +438,6 @@ func (f *Flag) trace(ctx context.Context, d Decision) {
 //	   trackUser(ctx, user)
 //	}
 func (f *Flag) Enabled(ctx context.Context) bool {
-	if f.strategy != nil {
-		if d := f.strategy.Enabled(ctx, f.name); d != Default {
-			f.trace(ctx, d)
-			return d == Enabled
-		}
-	}
-
 	if s := f.set.strategy.Load(); s != nil {
 		if d := (*s).Enabled(ctx, f.name); d != Default {
 			f.trace(ctx, d)

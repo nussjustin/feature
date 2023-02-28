@@ -16,13 +16,7 @@ import (
 func TestTracer_Tracing(t *testing.T) {
 	t.Run("Decision", func(t *testing.T) {
 		t.Run("Enabled", func(t *testing.T) {
-			flag := feature.RegisterFlag(
-				&feature.Set{},
-				"Case",
-				"",
-				nil,
-				feature.DefaultDisabled,
-			)
+			flag := feature.RegisterFlag(&feature.Set{}, "Case", "", feature.DefaultDisabled)
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
@@ -38,13 +32,7 @@ func TestTracer_Tracing(t *testing.T) {
 		})
 
 		t.Run("Disabled", func(t *testing.T) {
-			flag := feature.RegisterFlag(
-				&feature.Set{},
-				"Case",
-				"",
-				nil,
-				feature.DefaultDisabled,
-			)
+			flag := feature.RegisterFlag(&feature.Set{}, "Case", "", feature.DefaultDisabled)
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
@@ -62,13 +50,7 @@ func TestTracer_Tracing(t *testing.T) {
 
 	t.Run("Case", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
-			flag := feature.RegisterFlag(
-				&feature.Set{},
-				"Case",
-				"",
-				nil,
-				feature.DefaultDisabled,
-			)
+			flag := feature.RegisterFlag(&feature.Set{}, "Case", "", feature.DefaultDisabled)
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
@@ -84,13 +66,7 @@ func TestTracer_Tracing(t *testing.T) {
 		})
 
 		t.Run("Error", func(t *testing.T) {
-			flag := feature.RegisterFlag(
-				&feature.Set{},
-				"Case",
-				"",
-				nil,
-				feature.DefaultDisabled,
-			)
+			flag := feature.RegisterFlag(&feature.Set{}, "Case", "", feature.DefaultDisabled)
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
@@ -107,13 +83,7 @@ func TestTracer_Tracing(t *testing.T) {
 	})
 
 	t.Run("Case Panicked", func(t *testing.T) {
-		flag := feature.RegisterFlag(
-			&feature.Set{},
-			"Case",
-			"",
-			nil,
-			feature.DefaultDisabled,
-		)
+		flag := feature.RegisterFlag(&feature.Set{}, "Case", "", feature.DefaultDisabled)
 
 		spanRecorder := tracetest.NewSpanRecorder()
 		provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
@@ -131,13 +101,7 @@ func TestTracer_Tracing(t *testing.T) {
 
 	t.Run("Experiment", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
-			flag := feature.RegisterFlag(
-				&feature.Set{},
-				"Experiment",
-				"",
-				nil,
-				feature.DefaultDisabled,
-			)
+			flag := feature.RegisterFlag(&feature.Set{}, "Experiment", "", feature.DefaultDisabled)
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
@@ -154,13 +118,7 @@ func TestTracer_Tracing(t *testing.T) {
 		})
 
 		t.Run("Error", func(t *testing.T) {
-			flag := feature.RegisterFlag(
-				&feature.Set{},
-				"Experiment",
-				"",
-				nil,
-				feature.DefaultDisabled,
-			)
+			flag := feature.RegisterFlag(&feature.Set{}, "Experiment", "", feature.DefaultDisabled)
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
@@ -179,13 +137,7 @@ func TestTracer_Tracing(t *testing.T) {
 
 	t.Run("Run", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
-			flag := feature.RegisterFlag(
-				&feature.Set{},
-				"Run",
-				"",
-				nil,
-				feature.DefaultDisabled,
-			)
+			flag := feature.RegisterFlag(&feature.Set{}, "Run", "", feature.DefaultDisabled)
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
@@ -201,13 +153,7 @@ func TestTracer_Tracing(t *testing.T) {
 		})
 
 		t.Run("Error", func(t *testing.T) {
-			flag := feature.RegisterFlag(
-				&feature.Set{},
-				"Run",
-				"",
-				nil,
-				feature.DefaultDisabled,
-			)
+			flag := feature.RegisterFlag(&feature.Set{}, "Run", "", feature.DefaultDisabled)
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
