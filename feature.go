@@ -3,6 +3,7 @@ package feature
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 )
@@ -110,6 +111,31 @@ func (s *Set) getTracer() Tracer {
 		return *t
 	}
 	return Tracer{}
+}
+
+// Flags returns a slice containing all flags registered with the global [Set].
+//
+// See [Set.Flags] for more information.
+func Flags() []*Flag {
+	return globalSet.Flags()
+}
+
+// Flags returns a slice containing all registered flags order by name.
+func (s *Set) Flags() []*Flag {
+	s.mu.Lock()
+
+	fs := make([]*Flag, 0, len(s.flags))
+	for _, f := range s.flags {
+		fs = append(fs, f)
+	}
+
+	s.mu.Unlock()
+
+	sort.Slice(fs, func(i, j int) bool {
+		return fs[i].name < fs[j].name
+	})
+
+	return fs
 }
 
 func (s *Set) newFlag(name, description string, strategy Strategy, defaultDecision DefaultDecision) *Flag {

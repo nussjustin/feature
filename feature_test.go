@@ -55,6 +55,34 @@ func ExampleSet_SetStrategy() {
 	// Main logic...
 }
 
+func TestSetFlags(t *testing.T) {
+	if got, want := len(feature.Flags()), 0; got != want {
+		t.Errorf("got %d flags, want %d", got, want)
+	}
+
+	f1 := feature.NewFlag("TestSetFlags/f1", "", nil, feature.DefaultDisabled)
+	f3 := feature.NewFlag("TestSetFlags/f3", "", nil, feature.DefaultDisabled)
+	f2 := feature.NewFlag("TestSetFlags/f2", "", nil, feature.DefaultDisabled)
+
+	fs := feature.Flags()
+
+	if got, want := len(fs), 3; got != want {
+		t.Errorf("got %d flags, want %d", got, want)
+	}
+
+	if fs[0] != f1 {
+		t.Errorf("got flag %s at index %d, want %s", fs[0].Name(), 0, f1.Name())
+	}
+
+	if fs[1] != f2 {
+		t.Errorf("got flag %s at index %d, want %s", fs[1].Name(), 0, f2.Name())
+	}
+
+	if fs[2] != f3 {
+		t.Errorf("got flag %s at index %d, want %s", fs[2].Name(), 0, f3.Name())
+	}
+}
+
 func TestSetStrategy(t *testing.T) {
 	trim := func(s string) string {
 		return strings.TrimPrefix(s, "TestSetStrategy/")
@@ -140,38 +168,6 @@ func TestSetTracer(t *testing.T) {
 	if got, want := runCount, 1; got != want {
 		t.Errorf("got %d calls to Experiment, want %d", got, want)
 	}
-}
-
-func TestSet_SetStrategy(t *testing.T) {
-	var set feature.Set
-
-	lower := feature.StrategyFunc(func(_ context.Context, name string) feature.Decision {
-		return feature.If(strings.ToLower(name) == name)
-	})
-
-	upper := feature.StrategyFunc(func(_ context.Context, name string) feature.Decision {
-		return feature.If(strings.ToUpper(name) == name)
-	})
-
-	lowerFlag := feature.RegisterFlag(&set, "lower", "", nil, feature.DefaultDisabled)
-	mixedFlag := feature.RegisterFlag(&set, "Mixed", "", nil, feature.DefaultDisabled)
-	upperFlag := feature.RegisterFlag(&set, "UPPER", "", nil, feature.DefaultDisabled)
-
-	assertDisabled(t, lowerFlag)
-	assertDisabled(t, mixedFlag)
-	assertDisabled(t, upperFlag)
-
-	set.SetStrategy(lower)
-
-	assertEnabled(t, lowerFlag)
-	assertDisabled(t, mixedFlag)
-	assertDisabled(t, upperFlag)
-
-	set.SetStrategy(upper)
-
-	assertDisabled(t, lowerFlag)
-	assertDisabled(t, mixedFlag)
-	assertEnabled(t, upperFlag)
 }
 
 func ExampleCaseFor() {

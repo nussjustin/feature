@@ -70,7 +70,7 @@ The functions [NewCase](https://pkg.go.dev/github.com/nussjustin/feature#NewCase
 The previous example thus could also be written as
 
 ```go
-var newUICase = feature.newCase[*template.Template]("new-ui", "enables the new UI", nil, feature.DefaultDisabled)
+var newUICase = feature.NewCase[*template.Template]("new-ui", "enables the new UI", nil, feature.DefaultDisabled)
 ```
 
 Note that in this case the underlying `Flag` is completely hidden and can not be accessed directly.
