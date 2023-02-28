@@ -16,9 +16,9 @@ func TestCase_Experiment_Tracing(t *testing.T) {
 
 			set.SetTracer(tracerCallback(t))
 
-			c := feature.RegisterCase[int](&set, "some case", "", feature.DefaultEnabled)
+			f := feature.Register(&set, "some flag", "", feature.DefaultEnabled)
 
-			_, _ = c.Experiment(context.Background(),
+			_, _ = feature.Experiment(context.Background(), f,
 				func(context.Context) (int, error) { return enabled() },
 				func(context.Context) (int, error) { return disabled() },
 				feature.Equals[int])
@@ -94,7 +94,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		var set feature.Set
 
-		c := feature.RegisterCase[int](&set, "case name", "", feature.DefaultDisabled)
+		f := feature.Register(&set, "some flag", "", feature.DefaultDisabled)
 
 		set.SetStrategy(feature.Enabled)
 		set.SetTracer(feature.Tracer{
@@ -104,7 +104,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 			Run:        assertTracedRun(t, feature.Enabled, 2, nil),
 		})
 
-		_, _ = c.Run(context.Background(),
+		_, _ = feature.Run(context.Background(), f,
 			func(ctx context.Context) (int, error) { return 2, nil },
 			func(ctx context.Context) (int, error) { return 1, nil })
 	})
@@ -112,7 +112,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Error", func(t *testing.T) {
 		var set feature.Set
 
-		c := feature.RegisterCase[int](&set, "case name", "", feature.DefaultDisabled)
+		f := feature.Register(&set, "some flag", "", feature.DefaultDisabled)
 
 		err1, err2 := errors.New("error 1"), errors.New("error 2")
 
@@ -124,7 +124,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 			Run:        assertTracedRun(t, feature.Disabled, 1, err1),
 		})
 
-		_, _ = c.Run(context.Background(),
+		_, _ = feature.Run(context.Background(), f,
 			func(ctx context.Context) (int, error) { return 2, err2 },
 			func(ctx context.Context) (int, error) { return 1, err1 })
 	})
@@ -132,7 +132,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Panic", func(t *testing.T) {
 		var set feature.Set
 
-		c := feature.RegisterCase[int](&set, "case name", "", feature.DefaultDisabled)
+		f := feature.Register(&set, "some flag", "", feature.DefaultDisabled)
 
 		err := errors.New("error 1")
 
@@ -145,7 +145,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 			Run:          assertTracedRun(t, feature.Disabled, 0, err),
 		})
 
-		_, _ = c.Run(context.Background(),
+		_, _ = feature.Run(context.Background(), f,
 			func(ctx context.Context) (int, error) { return 2, nil },
 			func(ctx context.Context) (int, error) { panic(err) })
 	})

@@ -30,77 +30,53 @@ if newUIFlag.Enabled(ctx) {
 }
 ```
 
-### Using `Case` to switch between code paths
+### Using `Run` to switch between code paths
 
 A common use case for flags is switching between code paths, for example using a `if`/`else` combination.
 
-Instead of manually checking the flag state, a [Case](https://pkg.go.dev/github.com/nussjustin/feature#Case) can be used
-to abstract the switch.
+The global [Run](https://pkg.go.dev/github.com/nussjustin/feature#Run) function provides an abstraction for this.
 
-In addition to abstracting the condition, a `Case` also makes it possible to trace the decision making and results of
-the called function.
+When using the provided `Run` function both the decision making and the results of the call can be traced using the
+builtin tracing functionality.
 
-There are 2 ways to obtain a `Case`:
-
-#### Using `CaseFor` with an existing `Flag`:
-
-The global [CaseFor](https://pkg.go.dev/github.com/nussjustin/feature#CaseFor) function can be used to create a `Case`
-from an existing feature flag like this:
+To use `Run` first define a flag:
 
 ```go
-var newUICase = feature.CaseFor[*template.Template](
-	feature.New("new-ui", "enables the new UI", feature.DefaultDisabled),
-)
+var newUIFlag = feature.New("new-ui", "enables the new UI", feature.DefaultDisabled)
 ```
 
-The main method of `Case` is [Run](https://pkg.go.dev/github.com/nussjustin/feature#Case.Run) which takes two functions,
-one of which will be called depending on whether the flag is enabled.
+Later in your code, just call `Run` and pass the flag together with 2 callbacks, one for when the flag is enabled and
+one for when it is not.
 
 ```go
-tmpl, err := newUICase.Run(ctx, 
+tmpl, err := feature.Run(ctx, newUIFlag, 
 	func(context.Context) (*template.Template, error) { return template.Parse("new-ui/*.gotmpl") },
     func(context.Context) (*template.Template, error) { return template.Parse("old-ui/*.gotmpl") })
 ```
 
-#### Directly creating a `Case` using `NewCase` or `RegisterCase`
-
-The functions [NewCase](https://pkg.go.dev/github.com/nussjustin/feature#NewCase) and
-[RegisterCase](https://pkg.go.dev/github.com/nussjustin/feature#RegisterCase) allow creating a `Case` directly.
-
-The previous example thus could also be written as
-
-```go
-var newUICase = feature.NewCase[*template.Template]("new-ui", "enables the new UI", feature.DefaultDisabled)
-```
-
-Note that in this case the underlying `Flag` is completely hidden and can not be accessed directly.
-
 ### Running an experiment
 
-In addition to simply switching between two functions, a `Case` can also be used to run two functions and compare their
-result using a custom comparison function.
+In addition to simply switching between two functions using `Run`, it is also possible to run both two functions
+concurrently and compare their results in order to compare code paths.
 
-Both result of the experiment and the result of the comparison can be traced using the built in tracing functionality.
+To do this use the global [Experiment](https://pkg.go.dev/github.com/nussjustin/feature#Experiment) function and pass
+the feature flag, two functions that will be run and a callback to compare the results.
+
+Calling `Experiment` will automatically run both functions and compare the results and pass the result of the
+comparison to the `Tracer.Experiment` function of the configured `Tracer`, if any.
+
+The result of `Experiment` depends on the result of checking the flags status. If the flag is enabled, the results of
+the first function is returned. Otherwise the results of the second function are returned.
 
 Example:
 
 ```go
-result, err := optimizationCase.Experiment(ctx, optimizedFunction, unoptimizedFunction)
+result, err := feature.Experiment(ctx, optimizationFlag, optimizedFunction, unoptimizedFunction, feature.Equals)
 ```
-
-Both functions will be called concurrently and the results compared.
-
-By default, that is if the associated feature flag is disabled, the result of the second (control) function is returned
-no matter the result.
-
-If the feature flag is enabled the returned values will instead be the result of the first (experimental) function.
-
-This makes it possible to seamlessly switch over to using the new result while still allowing
-for a quick fallback to the old result by simply toggling the flag.
 
 ### Using different sets of flags
 
-All flags and cases created via `New` or `NewCase` belong to a single global set of flags.
+All flags and cases created via `New` belong to a single global set of flags.
 
 In some cases applications may want to have multiple sets, for example when extracting a piece of code into its own
 package and importing packages not wanting to clobber the global flag set with the imported, by not necessarily used
@@ -109,8 +85,7 @@ flags.
 For this and similar scenarios it is possible to create a custom
 [Set](https://pkg.go.dev/github.com/nussjustin/feature#Set) which acts as its own separate namespace of flags.
 
-When using a custom `Set` instead of using the `New` or `NewCase` functions, the `Register` and `RegisterCase`
-functions must be used, which take the `Set` as first parameter.
+When using a custom `Set` instead of using the `New` function, the `Register` function must be used.
 
 Example:
 
@@ -124,23 +99,12 @@ var optimizationFlag = feature.Register(
 	nil,
 	feature.DefaultDisabled,
 )
-
-var newUICase = feature.RegisterCase[*template.Template](
-	&mySet,
-	"new-ui",
-	"enables the new UI",
-	nil,
-	feature.DefaultDisabled,
-)
 ```
-
-`Flag`s registered on a custom `Set` can still use `CaseFor` to obtain a `Case`. 
 
 ### Using dynamic strategies for controlling flags
 
 By default, all flags are enabled or disabled simply based on the
-[DefaultDecision](https://pkg.go.dev/github.com/nussjustin/feature#DefaultDecision) given to `New`/`Register`/
-`NewCase`/`RegisterCase`.
+[DefaultDecision](https://pkg.go.dev/github.com/nussjustin/feature#DefaultDecision) given to `New`/`Register`.
 
 In many cases such static values are not enough, for example for applications that want to be able to change flags at
 runtime without having to restart the application or when wanting to enable only for some set of operations or users (
@@ -203,16 +167,16 @@ func main() {
 
 #### Order of checks
 
-When checking if a feature flag is enabled, first the `Strategy` associated with the `Flag`/`Case` is checked.
+When checking if a feature flag is enabled, first the `Strategy` associated with the `Flag` is checked.
 
 If the `Strategy` is nil or the result is `Default`, the `Strategy` associated with the set is used.
 
-If this is also nil or the result is also `Default`, the `DefaultDecision` of the `Flag/`/`Case` is used.
+If this is also nil or the result is also `Default`, the `DefaultDecision` of the `Flag/` is used.
 
 ## Tracing
 
-It is possible to trace the use `Flag`s and `Case`s using the
-[Tracer](https://pkg.go.dev/github.com/nussjustin/feature#Tracer) type.
+It is possible to trace the use of `Flag`s using the [Tracer](https://pkg.go.dev/github.com/nussjustin/feature#Tracer)
+type.
 
 In order to trace the use of this package simply use the global
 [SetStrategy](https://pkg.go.dev/github.com/nussjustin/feature#SetStrategy) function to register a `Tracer`:
@@ -237,8 +201,8 @@ func main() {
 
 The `otelfeature` package found at
 [github.com/nussjustin/feature/otelfeature](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature) exposes a
-function that returns pre-configured `Tracer` that implements basic metrics and tracing for `Flag`s and `Case`s using
-[OpenTelemetry](https://opentelemetry.io/).
+function that returns pre-configured `Tracer` that implements basic metrics and tracing for `Flag`s as well as the
+global `Run` and `Experiment` functions using [OpenTelemetry](https://opentelemetry.io/).
 
 In order to enable metrics collection and tracing use the global
 [otelfeature.Tracer](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature#Tracer) function to create a new

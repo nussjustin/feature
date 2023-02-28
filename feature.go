@@ -197,42 +197,6 @@ type Tracer struct {
 	Run func(context.Context, *Flag) (context.Context, func(d Decision, result any, err error))
 }
 
-// Case can be used to simplify running code paths dynamically based on whether a feature is enabled.
-//
-// Additionally, _experiments_ can be run using the [Case.Experiment] method, which compare the results of two
-// functions, while safely returning the correct value based on the status of the feature.
-//
-// See [Flag.Enabled] for an explanation on how a [Case] determines whether to return hew result from the first
-// (feature flag enabled) or second (feature flag disabled) function.
-//
-// A Case must be obtained using either [CaseFor], [NewCase] or [RegisterCase]
-//
-// The zero value is not valid.
-type Case[T any] struct {
-	flag *Flag
-}
-
-// CaseFor returns a new [Case] for the given registered [Flag].
-func CaseFor[T any](f *Flag) *Case[T] {
-	return &Case[T]{flag: f}
-}
-
-// NewCase registers and returns a new [Case] with the global [Set].
-//
-// See [RegisterCase] for more details.
-func NewCase[T any](name string, description string, defaultDecision DefaultDecision) *Case[T] {
-	return RegisterCase[T](&globalSet, name, description, defaultDecision)
-}
-
-// RegisterCase registers and returns a new [Flag] with the given [Set].
-//
-// A nil [Strategy] is equivalent to passing [Default].
-//
-// If the given name is already is use by another case or flag, RegisterCase will panic.
-func RegisterCase[T any](set *Set, name string, description string, defaultDecision DefaultDecision) *Case[T] {
-	return CaseFor[T](Register(set, name, description, defaultDecision))
-}
-
 // Equals returns a function that compares to values of the same type using ==.
 //
 // This can be used with [Case.Experiment] when T is a comparable type.
@@ -262,31 +226,6 @@ func (p *PanicError) Unwrap() error {
 	return nil
 }
 
-func (c *Case[T]) run(ctx context.Context, d Decision, f func(context.Context) (T, error)) (result T, err error) {
-	if t := c.flag.set.getTracer(); t.Case != nil {
-		var done func(any, error)
-		ctx, done = t.Case(ctx, c.flag, d)
-
-		if done != nil {
-			defer func() { done(result, err) }()
-		}
-	}
-
-	defer func() {
-		if v := recover(); v != nil {
-			panicErr := &PanicError{Recovered: v}
-
-			if t := c.flag.set.getTracer(); t.CasePanicked != nil {
-				t.CasePanicked(ctx, c.flag, d, panicErr)
-			}
-
-			err = panicErr
-		}
-	}()
-
-	return f(ctx)
-}
-
 // Experiment runs both an experimental and a control function concurrently and compares their results using equals.
 //
 // If the feature flag is enabled, the result of the experimental function will be returned, otherwise the result of the
@@ -299,18 +238,18 @@ func (c *Case[T]) run(ctx context.Context, d Decision, f func(context.Context) (
 //
 // When using values of a type that is comparable using ==, the global function [Equals] can be used to create the
 // comparison function.
-func (c *Case[T]) Experiment(ctx context.Context,
+func Experiment[T any](ctx context.Context, flag *Flag,
 	experimental func(context.Context) (T, error),
 	control func(context.Context) (T, error),
 	equals func(new, old T) bool,
 ) (T, error) {
 	var done func(d Decision, result any, err error, success bool)
-	if t := c.flag.set.getTracer(); t.Experiment != nil {
-		ctx, done = t.Experiment(ctx, c.flag)
+	if t := flag.set.getTracer(); t.Experiment != nil {
+		ctx, done = t.Experiment(ctx, flag)
 	}
 
 	// Check status before while the experiment runs. This can save some time if the used Strategy is slow.
-	isEnabled := c.flag.Enabled(ctx)
+	isEnabled := flag.Enabled(ctx)
 
 	var wg sync.WaitGroup
 	var (
@@ -324,13 +263,13 @@ func (c *Case[T]) Experiment(ctx context.Context,
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		experimentT, experimentErr = c.run(ctx, Enabled, experimental)
+		experimentT, experimentErr = run(ctx, flag, Enabled, experimental)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		controlT, controlErr = c.run(ctx, Disabled, control)
+		controlT, controlErr = run(ctx, flag, Disabled, control)
 	}()
 
 	wg.Wait()
@@ -355,29 +294,56 @@ func (c *Case[T]) Experiment(ctx context.Context,
 }
 
 // Run checks if the associated flag is enabled and runs either ifEnabled or ifDisabled and returns their result.
-func (c *Case[T]) Run(ctx context.Context,
+func Run[T any](ctx context.Context, flag *Flag,
 	ifEnabled func(context.Context) (T, error),
 	ifDisabled func(context.Context) (T, error),
 ) (T, error) {
 	var done func(Decision, any, error)
-	if t := c.flag.set.getTracer(); t.Run != nil {
-		ctx, done = t.Run(ctx, c.flag)
+	if t := flag.set.getTracer(); t.Run != nil {
+		ctx, done = t.Run(ctx, flag)
 	}
 
-	enabled := c.flag.Enabled(ctx)
+	enabled := flag.Enabled(ctx)
 
 	fn := ifDisabled
 	if enabled {
 		fn = ifEnabled
 	}
 
-	resultT, err := c.run(ctx, If(enabled), fn)
+	resultT, err := run(ctx, flag, If(enabled), fn)
 
 	if done != nil {
 		done(If(enabled), resultT, err)
 	}
 
 	return resultT, err
+}
+
+func run[T any](ctx context.Context, flag *Flag, d Decision, f func(context.Context) (T, error)) (result T, err error) {
+	t := flag.set.getTracer()
+
+	if t.Case != nil {
+		var done func(any, error)
+		ctx, done = t.Case(ctx, flag, d)
+
+		if done != nil {
+			defer func() { done(result, err) }()
+		}
+	}
+
+	defer func() {
+		if v := recover(); v != nil {
+			panicErr := &PanicError{Recovered: v}
+
+			if t.CasePanicked != nil {
+				t.CasePanicked(ctx, flag, d, panicErr)
+			}
+
+			err = panicErr
+		}
+	}()
+
+	return f(ctx)
 }
 
 // Flag represents a feature flag that can be enabled or disabled (toggled) dynamically at runtime and used to control
