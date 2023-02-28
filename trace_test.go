@@ -154,7 +154,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 func TestFlag_Enabled_Tracing(t *testing.T) {
 	var set feature.Set
 
-	flag := feature.RegisterFlag(&set, "", "", feature.DefaultDisabled)
+	flag := feature.Register(&set, "", "", feature.DefaultDisabled)
 
 	// Default decision
 	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, feature.Disabled)})

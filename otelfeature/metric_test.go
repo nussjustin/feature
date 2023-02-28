@@ -15,7 +15,7 @@ import (
 
 func TestTracer_Metrics(t *testing.T) {
 	createFlag := func(tb testing.TB) *feature.Flag {
-		return feature.RegisterFlag(&feature.Set{}, tb.Name(), "", feature.DefaultDisabled)
+		return feature.Register(&feature.Set{}, tb.Name(), "", feature.DefaultDisabled)
 	}
 
 	createTracer := func(tb testing.TB) (feature.Tracer, *testMeter) {

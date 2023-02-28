@@ -60,9 +60,9 @@ func TestSetFlags(t *testing.T) {
 		t.Errorf("got %d flags, want %d", got, want)
 	}
 
-	f1 := feature.NewFlag("TestSetFlags/f1", "", feature.DefaultDisabled)
-	f3 := feature.NewFlag("TestSetFlags/f3", "", feature.DefaultDisabled)
-	f2 := feature.NewFlag("TestSetFlags/f2", "", feature.DefaultDisabled)
+	f1 := feature.New("TestSetFlags/f1", "", feature.DefaultDisabled)
+	f3 := feature.New("TestSetFlags/f3", "", feature.DefaultDisabled)
+	f2 := feature.New("TestSetFlags/f2", "", feature.DefaultDisabled)
 
 	fs := feature.Flags()
 
@@ -96,9 +96,9 @@ func TestSetStrategy(t *testing.T) {
 		return feature.If(strings.ToUpper(trim(name)) == trim(name))
 	})
 
-	lowerFlag := feature.NewFlag("TestSetStrategy/lower", "", feature.DefaultDisabled)
-	mixedFlag := feature.NewFlag("TestSetStrategy/Mixed", "", feature.DefaultDisabled)
-	upperFlag := feature.NewFlag("TestSetStrategy/UPPER", "", feature.DefaultDisabled)
+	lowerFlag := feature.New("TestSetStrategy/lower", "", feature.DefaultDisabled)
+	mixedFlag := feature.New("TestSetStrategy/Mixed", "", feature.DefaultDisabled)
+	upperFlag := feature.New("TestSetStrategy/UPPER", "", feature.DefaultDisabled)
 
 	// Test initial setting
 	assertDisabled(t, lowerFlag)
@@ -174,7 +174,7 @@ func ExampleCaseFor() {
 	// CaseFor is useful if you have a flag that is already used somewhere and that can not be changed
 	// into a Case directly.
 
-	newUiFlag := feature.NewFlag("new-ui", "enables the new web ui", feature.DefaultEnabled)
+	newUiFlag := feature.New("new-ui", "enables the new web ui", feature.DefaultEnabled)
 
 	// Load old and new UI templates
 	oldUI := template.Must(template.ParseGlob("templates/old/*.gotmpl"))
@@ -195,7 +195,7 @@ func ExampleCaseFor() {
 
 func TestNewCase(t *testing.T) {
 	t.Run("FailsOnFlagWithSameName", func(t *testing.T) {
-		feature.NewFlag("TestNewCase/FailsOnCaseWithSameName", "", feature.DefaultDisabled)
+		feature.New("TestNewCase/FailsOnCaseWithSameName", "", feature.DefaultDisabled)
 
 		assertPanic(t, func() {
 			feature.NewCase[any]("TestNewCase/FailsOnCaseWithSameName", "", feature.DefaultDisabled)
@@ -214,7 +214,7 @@ func TestNewCase(t *testing.T) {
 func TestRegisterCase(t *testing.T) {
 	t.Run("FailsOnFlagWithSameName", func(t *testing.T) {
 		var set feature.Set
-		feature.RegisterFlag(&set, "FailsOnCaseWithSameName", "", feature.DefaultDisabled)
+		feature.Register(&set, "FailsOnCaseWithSameName", "", feature.DefaultDisabled)
 
 		assertPanic(t, func() {
 			feature.RegisterCase[any](&set, "FailsOnCaseWithSameName", "", feature.DefaultDisabled)
@@ -681,7 +681,7 @@ func TestCompare(t *testing.T) {
 
 func ExampleFlag() {
 	// Register flag. Most of the time this will be done globally.
-	newUiFlag := feature.NewFlag("new-ui", "enables the new web ui", feature.DefaultEnabled)
+	newUiFlag := feature.New("new-ui", "enables the new web ui", feature.DefaultEnabled)
 
 	// Load old and new UI templates
 	oldUI := template.Must(template.ParseGlob("templates/old/*.gotmpl"))
@@ -704,20 +704,20 @@ func TestNewFlag(t *testing.T) {
 		feature.NewCase[any]("TestNewFlag/FailsOnCaseWithSameName", "", feature.DefaultDisabled)
 
 		assertPanic(t, func() {
-			feature.NewFlag("TestNewFlag/FailsOnCaseWithSameName", "", feature.DefaultDisabled)
+			feature.New("TestNewFlag/FailsOnCaseWithSameName", "", feature.DefaultDisabled)
 		})
 	})
 
 	t.Run("FailsOnDuplicate", func(t *testing.T) {
-		feature.NewFlag("TestNewFlag/FailsOnDuplicate", "", feature.DefaultDisabled)
+		feature.New("TestNewFlag/FailsOnDuplicate", "", feature.DefaultDisabled)
 
 		assertPanic(t, func() {
-			feature.NewFlag("TestNewFlag/FailsOnDuplicate", "", feature.DefaultDisabled)
+			feature.New("TestNewFlag/FailsOnDuplicate", "", feature.DefaultDisabled)
 		})
 	})
 
 	t.Run("HasMetadata", func(t *testing.T) {
-		f := feature.NewFlag("TestNewFlag/HasMetadata", "some description", feature.DefaultEnabled)
+		f := feature.New("TestNewFlag/HasMetadata", "some description", feature.DefaultEnabled)
 
 		if got, want := f.Name(), "TestNewFlag/HasMetadata"; got != want {
 			t.Errorf("got f.Name() = %q, want %q", got, want)
@@ -735,16 +735,16 @@ func TestRegisterFlag(t *testing.T) {
 		feature.RegisterCase[any](&set, "FailsOnCaseWithSameName", "", feature.DefaultDisabled)
 
 		assertPanic(t, func() {
-			feature.RegisterFlag(&set, "FailsOnCaseWithSameName", "", feature.DefaultDisabled)
+			feature.Register(&set, "FailsOnCaseWithSameName", "", feature.DefaultDisabled)
 		})
 	})
 
 	t.Run("FailsOnDuplicate", func(t *testing.T) {
 		var set feature.Set
-		feature.RegisterFlag(&set, "FailsOnDuplicate", "", feature.DefaultDisabled)
+		feature.Register(&set, "FailsOnDuplicate", "", feature.DefaultDisabled)
 
 		assertPanic(t, func() {
-			feature.RegisterFlag(&set, "FailsOnDuplicate", "", feature.DefaultDisabled)
+			feature.Register(&set, "FailsOnDuplicate", "", feature.DefaultDisabled)
 		})
 	})
 }
@@ -752,8 +752,8 @@ func TestRegisterFlag(t *testing.T) {
 func TestFlag_Enabled(t *testing.T) {
 	t.Run("NoStrategy", func(t *testing.T) {
 		var set feature.Set
-		assertDisabled(t, feature.RegisterFlag(&set, "disabled", "", feature.DefaultDisabled))
-		assertEnabled(t, feature.RegisterFlag(&set, "enabled", "", feature.DefaultEnabled))
+		assertDisabled(t, feature.Register(&set, "disabled", "", feature.DefaultDisabled))
+		assertEnabled(t, feature.Register(&set, "enabled", "", feature.DefaultEnabled))
 	})
 
 	t.Run("StrategyOnSet", func(t *testing.T) {
@@ -762,9 +762,9 @@ func TestFlag_Enabled(t *testing.T) {
 			"disabled": feature.Enabled,
 			"enabled":  feature.Disabled,
 		})
-		assertEnabled(t, feature.RegisterFlag(&set, "disabled", "", feature.DefaultDisabled))
-		assertDisabled(t, feature.RegisterFlag(&set, "enabled", "", feature.DefaultEnabled))
-		assertDisabled(t, feature.RegisterFlag(&set, "unknown", "", feature.DefaultDisabled))
+		assertEnabled(t, feature.Register(&set, "disabled", "", feature.DefaultDisabled))
+		assertDisabled(t, feature.Register(&set, "enabled", "", feature.DefaultEnabled))
+		assertDisabled(t, feature.Register(&set, "unknown", "", feature.DefaultDisabled))
 	})
 
 	t.Run("Fallback", func(t *testing.T) {
@@ -775,10 +775,10 @@ func TestFlag_Enabled(t *testing.T) {
 			"enabled1":  feature.Default,
 			"enabled3":  feature.Default,
 		})
-		assertDisabled(t, feature.RegisterFlag(&set, "disabled1", "", feature.DefaultDisabled))
-		assertDisabled(t, feature.RegisterFlag(&set, "disabled2", "", feature.DefaultEnabled))
-		assertEnabled(t, feature.RegisterFlag(&set, "enabled1", "", feature.DefaultEnabled))
-		assertEnabled(t, feature.RegisterFlag(&set, "enabled2", "", feature.DefaultEnabled))
+		assertDisabled(t, feature.Register(&set, "disabled1", "", feature.DefaultDisabled))
+		assertDisabled(t, feature.Register(&set, "disabled2", "", feature.DefaultEnabled))
+		assertEnabled(t, feature.Register(&set, "enabled1", "", feature.DefaultEnabled))
+		assertEnabled(t, feature.Register(&set, "enabled2", "", feature.DefaultEnabled))
 	})
 }
 

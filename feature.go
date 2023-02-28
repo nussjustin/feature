@@ -230,7 +230,7 @@ func NewCase[T any](name string, description string, defaultDecision DefaultDeci
 //
 // If the given name is already is use by another case or flag, RegisterCase will panic.
 func RegisterCase[T any](set *Set, name string, description string, defaultDecision DefaultDecision) *Case[T] {
-	return CaseFor[T](RegisterFlag(set, name, description, defaultDecision))
+	return CaseFor[T](Register(set, name, description, defaultDecision))
 }
 
 // Equals returns a function that compares to values of the same type using ==.
@@ -386,7 +386,7 @@ func (c *Case[T]) Run(ctx context.Context,
 // In many cases a [Case] can be used to simplify working with a [Flag]. See the documentation and examples for [Case]
 // for more information on how to use a [Case].
 //
-// A Flag must be obtained using either [NewFlag] or [RegisterFlag].
+// A Flag must be obtained using either [New] or [Register].
 //
 // The zero value is not valid.
 type Flag struct {
@@ -397,19 +397,19 @@ type Flag struct {
 	defaultDecision DefaultDecision
 }
 
-// NewFlag registers and returns a new [Flag] with the global [Set].
+// New registers and returns a new [Flag] with the global [Set].
 //
-// See [RegisterFlag] for more details.
-func NewFlag(name string, description string, defaultDecision DefaultDecision) *Flag {
-	return RegisterFlag(&globalSet, name, description, defaultDecision)
+// See [Register] for more details.
+func New(name string, description string, defaultDecision DefaultDecision) *Flag {
+	return Register(&globalSet, name, description, defaultDecision)
 }
 
-// RegisterFlag registers and returns a new [Flag] with the given [Set].
+// Register registers and returns a new [Flag] with the given [Set].
 //
 // A nil [Strategy] is equivalent to passing [Default].
 //
-// If the given name is already is use by another case or flag, RegisterFlag will panic.
-func RegisterFlag(set *Set, name string, description string, defaultDecision DefaultDecision) *Flag {
+// If the given name is already is use by another case or flag, Register will panic.
+func Register(set *Set, name string, description string, defaultDecision DefaultDecision) *Flag {
 	return set.newFlag(name, description, defaultDecision)
 }
 
@@ -451,12 +451,12 @@ func (f *Flag) Enabled(ctx context.Context) bool {
 	return d == Enabled
 }
 
-// Name returns the name passed to [NewFlag] or [RegisterFlag].
+// Name returns the name passed to [New] or [Register].
 func (f *Flag) Name() string {
 	return f.name
 }
 
-// Description returns the description passed to [NewFlag] or [RegisterFlag].
+// Description returns the description passed to [New] or [Register].
 func (f *Flag) Description() string {
 	return f.description
 }

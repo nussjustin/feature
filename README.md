@@ -6,15 +6,15 @@ Package feature provides a simple, easy to use abstraction for working with feat
 
 ### Defining and checking a flag
 
-To define a flag use the [NewFlag](https://pkg.go.dev/github.com/nussjustin/feature#NewFlag) or
-[RegisterFlag](https://pkg.go.dev/github.com/nussjustin/feature#RegisterFlag) functions.
+To define a flag use the [New](https://pkg.go.dev/github.com/nussjustin/feature#New) or
+[Register](https://pkg.go.dev/github.com/nussjustin/feature#Register) functions.
 
 Both functions take a name for the flag, and optional description, an optional
 [Strategy](https://pkg.go.dev/github.com/nussjustin/feature#Strategy) that can be used to toggle the flag dynamically
 and a default _decision_ (whether the feature should be enabled or disabled).
 
 ```go
-var newUIFlag = feature.NewFlag("new-ui", "enables the new UI", feature.DefaultDisabled)
+var newUIFlag = feature.New("new-ui", "enables the new UI", feature.DefaultDisabled)
 ```
 
 The status of the flag can be checked via the [Enabled](https://pkg.go.dev/github.com/nussjustin/feature#Flag.Enabled)
@@ -49,7 +49,7 @@ from an existing feature flag like this:
 
 ```go
 var newUICase = feature.CaseFor[*template.Template](
-	feature.NewFlag("new-ui", "enables the new UI", feature.DefaultDisabled),
+	feature.New("new-ui", "enables the new UI", feature.DefaultDisabled),
 )
 ```
 
@@ -100,7 +100,7 @@ for a quick fallback to the old result by simply toggling the flag.
 
 ### Using different sets of flags
 
-All flags and cases created via `NewFlag` or `NewCase` belong to a single global set of flags.
+All flags and cases created via `New` or `NewCase` belong to a single global set of flags.
 
 In some cases applications may want to have multiple sets, for example when extracting a piece of code into its own
 package and importing packages not wanting to clobber the global flag set with the imported, by not necessarily used
@@ -109,7 +109,7 @@ flags.
 For this and similar scenarios it is possible to create a custom
 [Set](https://pkg.go.dev/github.com/nussjustin/feature#Set) which acts as its own separate namespace of flags.
 
-When using a custom `Set` instead of using the `NewFlag` or `NewCase` functions, the `RegisterFlag` and `RegisterCase`
+When using a custom `Set` instead of using the `New` or `NewCase` functions, the `Register` and `RegisterCase`
 functions must be used, which take the `Set` as first parameter.
 
 Example:
@@ -117,7 +117,7 @@ Example:
 ```go
 var mySet feature.Set // zero value is valid
 
-var optimizationFlag = feature.RegisterFlag(
+var optimizationFlag = feature.Register(
 	&mySet,
 	"new-ui",
 	"enables the new UI", 
@@ -139,7 +139,7 @@ var newUICase = feature.RegisterCase[*template.Template](
 ### Using dynamic strategies for controlling flags
 
 By default, all flags are enabled or disabled simply based on the
-[DefaultDecision](https://pkg.go.dev/github.com/nussjustin/feature#DefaultDecision) given to `NewFlag`/`RegisterFlag`/
+[DefaultDecision](https://pkg.go.dev/github.com/nussjustin/feature#DefaultDecision) given to `New`/`Register`/
 `NewCase`/`RegisterCase`.
 
 In many cases such static values are not enough, for example for applications that want to be able to change flags at
@@ -160,7 +160,7 @@ By implementing the `Strategy` interface applications can make dynamic decisions
 
 #### Per feature `Strategy`
 
-A `Strategy` can be set directly on a `Flag`/`Case` as part of the initial `NewFlag`/`RegisterFlag`/`NewCase`/
+A `Strategy` can be set directly on a `Flag`/`Case` as part of the initial `New`/`Register`/`NewCase`/
 `RegisterCase` call.
 
 Example:
