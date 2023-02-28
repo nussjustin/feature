@@ -29,7 +29,7 @@ func ExampleIf() {
 }
 
 func TestDecision_Enabled(t *testing.T) {
-	assertDecision(t, feature.Default, "", feature.Default)
+	assertDecision(t, feature.NoDecision, "", feature.NoDecision)
 	assertDecision(t, feature.Disabled, "", feature.Disabled)
 	assertDecision(t, feature.Enabled, "", feature.Enabled)
 }
@@ -120,7 +120,7 @@ func TestSetStrategy(t *testing.T) {
 	assertEnabled(t, upperFlag)
 
 	// Test multiple
-	feature.SetStrategy(feature.Default, upper, lower)
+	feature.SetStrategy(feature.NoDecision, upper, lower)
 
 	assertDisabled(t, lowerFlag)
 	assertDisabled(t, mixedFlag)
@@ -519,7 +519,7 @@ func TestCase_Run(t *testing.T) {
 		},
 		{
 			Name:     "Old by default via strategy",
-			Strategy: feature.Default,
+			Strategy: feature.NoDecision,
 			Old:      result{N: 1},
 			Expected: result{N: 1},
 		},
@@ -701,10 +701,10 @@ func TestFlag_Enabled(t *testing.T) {
 	t.Run("Fallback", func(t *testing.T) {
 		var set feature.Set
 		set.SetStrategy(feature.StrategyMap{
-			"disabled1": feature.Default,
+			"disabled1": feature.NoDecision,
 			"disabled2": feature.Disabled,
-			"enabled1":  feature.Default,
-			"enabled3":  feature.Default,
+			"enabled1":  feature.NoDecision,
+			"enabled3":  feature.NoDecision,
 		})
 		assertDisabled(t, feature.Register(&set, "disabled1", "", feature.DefaultDisabled))
 		assertDisabled(t, feature.Register(&set, "disabled2", "", feature.DefaultEnabled))
@@ -748,7 +748,7 @@ func TestStrategyMap_Enabled(t *testing.T) {
 	}
 
 	assertDecision(t, s, "Brad", feature.Disabled)
-	assertDecision(t, s, "Ian", feature.Default)
+	assertDecision(t, s, "Ian", feature.NoDecision)
 	assertDecision(t, s, "Rob", feature.Enabled)
 }
 

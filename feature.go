@@ -17,15 +17,15 @@ import (
 type Decision string
 
 const (
-	// Default hands over the decision to the Flag.
-	Default Decision = "default"
+	// NoDecision indicates that a Strategy could not make a final Decision for a Flag.
+	NoDecision Decision = "no decision"
 	// Disabled disables a feature flag and the new code path of the corresponding case.
 	Disabled Decision = "disabled"
 	// Enabled enables a feature flag and the new code path of the corresponding case.
 	Enabled Decision = "enabled"
 )
 
-var _ Strategy = Default
+var _ Strategy = NoDecision
 
 // If returns Enabled when the first argument is true, or Disabled otherwise.
 func If(cond bool) Decision {
@@ -42,13 +42,13 @@ func (d Decision) Enabled(context.Context, string) Decision {
 	return d
 }
 
-// DefaultDecision is set when creating a [Flag] or [Case] and is used when [Default] is returned by the [Strategy].
+// DefaultDecision is set when creating a [Flag] or [Case] and is used when [NoDecision] is returned by the [Strategy].
 type DefaultDecision string
 
 const (
-	// DefaultDisabled causes flags and cases to treat a Default decision as Disabled.
+	// DefaultDisabled causes flags and cases to treat a NoDecision decision as Disabled.
 	DefaultDisabled DefaultDecision = "disabled"
-	// DefaultEnabled causes flags and cases to treat a Default decision as Enabled.
+	// DefaultEnabled causes flags and cases to treat a NoDecision decision as Enabled.
 	DefaultEnabled DefaultDecision = "enabled"
 )
 
@@ -68,8 +68,8 @@ var globalSet Set
 
 // SetStrategy sets or removes the [Strategy] for the global [Set].
 //
-// If more than one non-nil [Strategy] is given they will be checked in the order given, using the first non-[Default]
-// decision as the final result.
+// If more than one non-nil [Strategy] is given they will be checked in the order given, using the first result that
+// is not [NoDecision] as the final result.
 //
 // See [Set.SetStrategy] for more information.
 func SetStrategy(strategy Strategy, others ...Strategy) {
@@ -78,8 +78,8 @@ func SetStrategy(strategy Strategy, others ...Strategy) {
 
 // SetStrategy sets or removes the [Strategy] used by s to make decisions.
 //
-// If more than one non-nil [Strategy] is given they will be checked in the order given, using the first non-[Default]
-// decision as the final result.
+// If more than one non-nil [Strategy] is given they will be checked in the order given, using the first result that
+// is not [NoDecision] as the final result.
 func (s *Set) SetStrategy(strategy Strategy, others ...Strategy) {
 	if len(others) > 0 {
 		strategy = chainStrategies(append([]Strategy{strategy}, others...))
@@ -372,7 +372,7 @@ func New(name string, description string, defaultDecision DefaultDecision) *Flag
 
 // Register registers and returns a new [Flag] with the given [Set].
 //
-// A nil [Strategy] is equivalent to passing [Default].
+// A nil [Strategy] is equivalent to passing [NoDecision].
 //
 // If the given name is already is use by another case or flag, Register will panic.
 func Register(set *Set, name string, description string, defaultDecision DefaultDecision) *Flag {
@@ -389,11 +389,11 @@ func (f *Flag) trace(ctx context.Context, d Decision) {
 //
 // The status of the flag is determined as follows:
 //
-//  1. The [Strategy] of the [Flag] is checked. If no [Strategy] is set on the [Flag] or the [Strategy] returns [Default]
-//     Enabled will continue to the next step.
+//  1. The [Strategy] of the [Flag] is checked. If no [Strategy] is set on the [Flag] or the [Strategy] returns
+//     [NoDecision], Enabled will continue to the next step.
 //
 //  2. The [Strategy] of the associated [Set] is checked. If no [Strategy] is set on the [Set] or the [Strategy] returns
-//     [Default], Enabled will continue to the next step.
+//     [NoDecision], Enabled will continue to the next step.
 //
 //  3. If the previous steps did not result in a final decision ([Enabled] or [Disabled]), the [DefaultDecision] of the
 //     flag is used.
@@ -405,7 +405,7 @@ func (f *Flag) trace(ctx context.Context, d Decision) {
 //	}
 func (f *Flag) Enabled(ctx context.Context) bool {
 	if s := f.set.strategy.Load(); s != nil {
-		if d := (*s).Enabled(ctx, f.name); d != Default {
+		if d := (*s).Enabled(ctx, f.name); d != NoDecision {
 			f.trace(ctx, d)
 			return d == Enabled
 		}
@@ -439,11 +439,11 @@ type chainStrategy []Strategy
 
 func (c chainStrategy) Enabled(ctx context.Context, name string) Decision {
 	for _, s := range c {
-		if d := s.Enabled(ctx, name); d != Default {
+		if d := s.Enabled(ctx, name); d != NoDecision {
 			return d
 		}
 	}
-	return Default
+	return NoDecision
 }
 
 func chainStrategies(strategies []Strategy) Strategy {
@@ -479,10 +479,10 @@ var _ Strategy = (StrategyMap)(nil)
 
 // Enabled implements the [Strategy] interface.
 //
-// If a feature with the given name is not found, [Default] is returned.
+// If a feature with the given name is not found, [NoDecision] is returned.
 func (m StrategyMap) Enabled(ctx context.Context, name string) Decision {
 	if s, ok := m[name]; ok {
 		return s.Enabled(ctx, name)
 	}
-	return Default
+	return NoDecision
 }
