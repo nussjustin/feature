@@ -161,7 +161,7 @@ func TestTracer_Metrics(t *testing.T) {
 			otelfeature.AttributeFeatureName.String(flag.Name()))
 	})
 
-	t.Run("Run", func(t *testing.T) {
+	t.Run("Switch", func(t *testing.T) {
 		flag := createFlag(t)
 
 		tracer, meter := createTracer(t)

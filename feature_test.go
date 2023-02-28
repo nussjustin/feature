@@ -153,7 +153,7 @@ func TestSetTracer(t *testing.T) {
 
 	f := feature.New("TestSetTracerProvider", "", feature.DefaultDisabled)
 
-	_, _ = feature.Run(context.Background(), f,
+	_, _ = feature.Switch(context.Background(), f,
 		func(context.Context) (int, error) { return 2, nil },
 		func(context.Context) (int, error) { return 1, nil })
 
@@ -489,7 +489,7 @@ func ExampleRun() {
 
 	// later
 
-	post, err := feature.Run(myCtx, optimizationFlag,
+	post, err := feature.Switch(myCtx, optimizationFlag,
 		func(ctx context.Context) (Post, error) { return loadPostOptimized(ctx, postId) },
 		func(ctx context.Context) (Post, error) { return loadPost(ctx, postId) })
 	if err != nil {
@@ -561,7 +561,7 @@ func TestCase_Run(t *testing.T) {
 
 			f := feature.Register(&set, "case", "", feature.DefaultDisabled)
 
-			n, err := feature.Run(ctx, f,
+			n, err := feature.Switch(ctx, f,
 				func(ctx context.Context) (int, error) { return testCase.New.N, testCase.New.Error },
 				func(ctx context.Context) (int, error) { return testCase.Old.N, testCase.Old.Error })
 			if !reflect.DeepEqual(err, testCase.Expected.Error) {
@@ -583,7 +583,7 @@ func TestCase_Run_Panic(t *testing.T) {
 
 			f := feature.Register(&set, "case", "", feature.DefaultDisabled)
 
-			n, err := feature.Run(ctx, f,
+			n, err := feature.Switch(ctx, f,
 				func(ctx context.Context) (int, error) { return enabled() },
 				func(ctx context.Context) (int, error) { return disabled() })
 			assertError(t, wantErr, err)

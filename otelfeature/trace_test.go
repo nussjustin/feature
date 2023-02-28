@@ -135,9 +135,9 @@ func TestTracer_Tracing(t *testing.T) {
 		})
 	})
 
-	t.Run("Run", func(t *testing.T) {
+	t.Run("Switch", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
-			flag := feature.Register(&feature.Set{}, "Run", "", feature.DefaultDisabled)
+			flag := feature.Register(&feature.Set{}, "Switch", "", feature.DefaultDisabled)
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
@@ -153,7 +153,7 @@ func TestTracer_Tracing(t *testing.T) {
 		})
 
 		t.Run("Error", func(t *testing.T) {
-			flag := feature.Register(&feature.Set{}, "Run", "", feature.DefaultDisabled)
+			flag := feature.Register(&feature.Set{}, "Switch", "", feature.DefaultDisabled)
 
 			spanRecorder := tracetest.NewSpanRecorder()
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))

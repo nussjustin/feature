@@ -169,7 +169,7 @@ type Tracer struct {
 	// Decision is called every time [Flag.Enabled] is called.
 	Decision func(context.Context, *Flag, Decision)
 
-	// Case is called for each called function during [Case.Experiment] as well as for the function called by [Case.Run].
+	// Case is called for each called function during [Case.Experiment] as well as for the function called by [Case.Switch].
 	//
 	// The returned function is called after the called function has returned with the values returned by the function.
 	//
@@ -188,7 +188,7 @@ type Tracer struct {
 	// The returned function can be nil.
 	Experiment func(context.Context, *Flag) (context.Context, func(d Decision, result any, err error, success bool))
 
-	// Run is called at the beginning of every call to [Case.Run].
+	// Run is called at the beginning of every call to [Case.Switch].
 	//
 	// The returned function is called with the [Decision] made by the given [Flag] as well and the result that will
 	// be returned.
@@ -293,8 +293,8 @@ func Experiment[T any](ctx context.Context, flag *Flag,
 	return result, err
 }
 
-// Run checks if the associated flag is enabled and runs either ifEnabled or ifDisabled and returns their result.
-func Run[T any](ctx context.Context, flag *Flag,
+// Switch checks if the associated flag is enabled and runs either ifEnabled or ifDisabled and returns their result.
+func Switch[T any](ctx context.Context, flag *Flag,
 	ifEnabled func(context.Context) (T, error),
 	ifDisabled func(context.Context) (T, error),
 ) (T, error) {

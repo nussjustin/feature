@@ -30,33 +30,33 @@ if newUIFlag.Enabled(ctx) {
 }
 ```
 
-### Using `Run` to switch between code paths
+### Using `Switch` to switch between code paths
 
 A common use case for flags is switching between code paths, for example using a `if`/`else` combination.
 
-The global [Run](https://pkg.go.dev/github.com/nussjustin/feature#Run) function provides an abstraction for this.
+The global [Switch](https://pkg.go.dev/github.com/nussjustin/feature#Switch) function provides an abstraction for this.
 
-When using the provided `Run` function both the decision making and the results of the call can be traced using the
+When using the provided `Switch` function both the decision making and the results of the call can be traced using the
 builtin tracing functionality.
 
-To use `Run` first define a flag:
+To use `Switch` first define a flag:
 
 ```go
 var newUIFlag = feature.New("new-ui", "enables the new UI", feature.DefaultDisabled)
 ```
 
-Later in your code, just call `Run` and pass the flag together with 2 callbacks, one for when the flag is enabled and
+Later in your code, just call `Switch` and pass the flag together with 2 callbacks, one for when the flag is enabled and
 one for when it is not.
 
 ```go
-tmpl, err := feature.Run(ctx, newUIFlag, 
+tmpl, err := feature.Switch(ctx, newUIFlag, 
 	func(context.Context) (*template.Template, error) { return template.Parse("new-ui/*.gotmpl") },
     func(context.Context) (*template.Template, error) { return template.Parse("old-ui/*.gotmpl") })
 ```
 
 ### Running an experiment
 
-In addition to simply switching between two functions using `Run`, it is also possible to run both two functions
+In addition to simply switching between two functions using `Switch`, it is also possible to run both two functions
 concurrently and compare their results in order to compare code paths.
 
 To do this use the global [Experiment](https://pkg.go.dev/github.com/nussjustin/feature#Experiment) function and pass
@@ -202,7 +202,7 @@ func main() {
 The `otelfeature` package found at
 [github.com/nussjustin/feature/otelfeature](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature) exposes a
 function that returns pre-configured `Tracer` that implements basic metrics and tracing for `Flag`s as well as the
-global `Run` and `Experiment` functions using [OpenTelemetry](https://opentelemetry.io/).
+global `Switch` and `Experiment` functions using [OpenTelemetry](https://opentelemetry.io/).
 
 In order to enable metrics collection and tracing use the global
 [otelfeature.Tracer](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature#Tracer) function to create a new

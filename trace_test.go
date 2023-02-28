@@ -104,7 +104,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 			Run:        assertTracedRun(t, feature.Enabled, 2, nil),
 		})
 
-		_, _ = feature.Run(context.Background(), f,
+		_, _ = feature.Switch(context.Background(), f,
 			func(ctx context.Context) (int, error) { return 2, nil },
 			func(ctx context.Context) (int, error) { return 1, nil })
 	})
@@ -124,7 +124,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 			Run:        assertTracedRun(t, feature.Disabled, 1, err1),
 		})
 
-		_, _ = feature.Run(context.Background(), f,
+		_, _ = feature.Switch(context.Background(), f,
 			func(ctx context.Context) (int, error) { return 2, err2 },
 			func(ctx context.Context) (int, error) { return 1, err1 })
 	})
@@ -145,7 +145,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 			Run:          assertTracedRun(t, feature.Disabled, 0, err),
 		})
 
-		_, _ = feature.Run(context.Background(), f,
+		_, _ = feature.Switch(context.Background(), f,
 			func(ctx context.Context) (int, error) { return 2, nil },
 			func(ctx context.Context) (int, error) { panic(err) })
 	})
@@ -302,7 +302,7 @@ func assertTracedExperiment(
 
 func assertNoTracedRun(tb testing.TB) func(context.Context, *feature.Flag) (context.Context, func(feature.Decision, any, error)) {
 	return func(context.Context, *feature.Flag) (context.Context, func(feature.Decision, any, error)) {
-		tb.Fatal("Run called")
+		tb.Fatal("Switch called")
 		return nil, nil
 	}
 }
@@ -313,7 +313,7 @@ func assertTracedRun(
 	want any,
 	wantErr error,
 ) func(context.Context, *feature.Flag) (context.Context, func(feature.Decision, any, error)) {
-	called := assertCalled(tb, "Run")
+	called := assertCalled(tb, "Switch")
 
 	return func(ctx context.Context, _ *feature.Flag) (context.Context, func(feature.Decision, any, error)) {
 		return ctx, func(gotDecision feature.Decision, got any, gotErr error) {
