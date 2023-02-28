@@ -158,47 +158,6 @@ type Strategy interface {
 
 By implementing the `Strategy` interface applications can make dynamic decisions for flags.
 
-#### Per feature `Strategy`
-
-A `Strategy` can be set directly on a `Flag`/`Case` as part of the initial `New`/`Register`/`NewCase`/
-`RegisterCase` call.
-
-Example:
-
-```go
-var newUICase = feature.RegisterCase[*template.Template](
-	&mySet,
-	"new-ui",
-	"enables the new UI",
-	// Create a strategy from a function, similar to how http.HandlerFunc creates a http.Handler from a function.
-	feature.StrategyFunc(func(ctx context.Context, _ string) feature.Decision {
-		// Enable new UI only for admins
-		if user.IsAdmin(ctx) {
-			return feature.Enabled
-		}
-		
-		return feature.Disabled
-	}),
-	feature.DefaultDisabled,
-)
-```
-
-Or using the global [EnabledIf](https://pkg.go.dev/github.com/nussjustin/feature#EnabledIf) helper function:
-
-```go
-var newUICase = feature.RegisterCase[*template.Template](
-	&mySet,
-	"new-ui",
-	"enables the new UI",
-	feature.StrategyFunc(func(ctx context.Context, _ string) feature.Decision {
-		// Enable new UI only for admins
-		return feature.EnabledIf(user.IsAdmin(ctx))
-	}),
-	feature.DefaultDisabled,
-)
-```
-
-
 #### Per set/global `Strategy`
 
 It is also possible to set a per set `Strategy` using the
