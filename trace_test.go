@@ -16,7 +16,7 @@ func TestCase_Experiment_Tracing(t *testing.T) {
 
 			set.SetTracer(tracerCallback(t))
 
-			f := feature.Register(&set, "some flag", "", feature.DefaultEnabled)
+			f := set.New("some flag", "", feature.DefaultEnabled)
 
 			_, _ = feature.Experiment(context.Background(), f,
 				func(context.Context) (int, error) { return enabled() },
@@ -94,7 +94,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		var set feature.Set
 
-		f := feature.Register(&set, "some flag", "", feature.DefaultDisabled)
+		f := set.New("some flag", "", feature.DefaultDisabled)
 
 		set.SetStrategy(feature.Enabled)
 		set.SetTracer(feature.Tracer{
@@ -112,7 +112,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Error", func(t *testing.T) {
 		var set feature.Set
 
-		f := feature.Register(&set, "some flag", "", feature.DefaultDisabled)
+		f := set.New("some flag", "", feature.DefaultDisabled)
 
 		err1, err2 := errors.New("error 1"), errors.New("error 2")
 
@@ -132,7 +132,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Panic", func(t *testing.T) {
 		var set feature.Set
 
-		f := feature.Register(&set, "some flag", "", feature.DefaultDisabled)
+		f := set.New("some flag", "", feature.DefaultDisabled)
 
 		err := errors.New("error 1")
 
@@ -154,7 +154,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 func TestFlag_Enabled_Tracing(t *testing.T) {
 	var set feature.Set
 
-	flag := feature.Register(&set, "", "", feature.DefaultDisabled)
+	flag := set.New("", "", feature.DefaultDisabled)
 
 	// NoDecision decision
 	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, feature.Disabled)})

@@ -66,6 +66,20 @@ type Set struct {
 
 var globalSet Set
 
+// New registers and returns a new [Flag] with the global [Set].
+//
+// See [Set.New] for more details.
+func New(name string, description string, defaultDecision DefaultDecision) *Flag {
+	return globalSet.New(name, description, defaultDecision)
+}
+
+// New registers and returns a new [Flag] on s.
+//
+// If the given name is already is use by another flag, Register will panic.
+func (s *Set) New(name string, description string, defaultDecision DefaultDecision) *Flag {
+	return s.newFlag(name, description, defaultDecision)
+}
+
 // SetStrategy sets or removes the [Strategy] for the global [Set].
 //
 // If more than one non-nil [Strategy] is given they will be checked in the order given, using the first result that
@@ -169,7 +183,7 @@ type Tracer struct {
 	// Decision is called every time [Flag.Enabled] is called.
 	Decision func(context.Context, *Flag, Decision)
 
-	// Case is called for each called function during [Case.Experiment] as well as for the function called by [Case.Switch].
+	// Case is called for each called function during [Experiment] as well as for the function called by [Switch].
 	//
 	// The returned function is called after the called function has returned with the values returned by the function.
 	//
@@ -361,22 +375,6 @@ type Flag struct {
 	name            string
 	description     string
 	defaultDecision DefaultDecision
-}
-
-// New registers and returns a new [Flag] with the global [Set].
-//
-// See [Register] for more details.
-func New(name string, description string, defaultDecision DefaultDecision) *Flag {
-	return Register(&globalSet, name, description, defaultDecision)
-}
-
-// Register registers and returns a new [Flag] with the given [Set].
-//
-// A nil [Strategy] is equivalent to passing [NoDecision].
-//
-// If the given name is already is use by another case or flag, Register will panic.
-func Register(set *Set, name string, description string, defaultDecision DefaultDecision) *Flag {
-	return set.newFlag(name, description, defaultDecision)
 }
 
 func (f *Flag) trace(ctx context.Context, d Decision) {

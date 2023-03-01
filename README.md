@@ -6,12 +6,12 @@ Package feature provides a simple, easy to use abstraction for working with feat
 
 ### Defining and checking a flag
 
-To define a flag use the [New](https://pkg.go.dev/github.com/nussjustin/feature#New) or
-[Register](https://pkg.go.dev/github.com/nussjustin/feature#Register) functions.
+To define a flag use the global [New](https://pkg.go.dev/github.com/nussjustin/feature#New) function or, when using a
+custom [Set](https://pkg.go.dev/github.com/nussjustin/feature#Set),
+[Set.New](https://pkg.go.dev/github.com/nussjustin/feature#Set.New).
 
-Both functions take a name for the flag, and optional description, an optional
-[Strategy](https://pkg.go.dev/github.com/nussjustin/feature#Strategy) that can be used to toggle the flag dynamically
-and a default _decision_ (whether the feature should be enabled or disabled).
+`New` takes a name for the flag, an optional description and a default _decision_ (whether the feature should be
+enabled or disabled when no `Strategy` can make a decision).
 
 ```go
 var newUIFlag = feature.New("new-ui", "enables the new UI", feature.DefaultDisabled)
@@ -85,15 +85,14 @@ flags.
 For this and similar scenarios it is possible to create a custom
 [Set](https://pkg.go.dev/github.com/nussjustin/feature#Set) which acts as its own separate namespace of flags.
 
-When using a custom `Set` instead of using the `New` function, the `Register` function must be used.
+When using a custom `Set` instead of using the `New` function, the `Set.New` method must be used.
 
 Example:
 
 ```go
 var mySet feature.Set // zero value is valid
 
-var optimizationFlag = feature.Register(
-	&mySet,
+var optimizationFlag = mySet.New(
 	"new-ui",
 	"enables the new UI", 
 	nil,
@@ -104,7 +103,7 @@ var optimizationFlag = feature.Register(
 ### Using dynamic strategies for controlling flags
 
 By default, all flags are enabled or disabled simply based on the
-[DefaultDecision](https://pkg.go.dev/github.com/nussjustin/feature#DefaultDecision) given to `New`/`Register`.
+[DefaultDecision](https://pkg.go.dev/github.com/nussjustin/feature#DefaultDecision) given to `New`.
 
 In many cases such static values are not enough, for example for applications that want to be able to change flags at
 runtime without having to restart the application or when wanting to enable only for some set of operations or users (

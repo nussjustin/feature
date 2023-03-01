@@ -195,7 +195,7 @@ func TestCase_Experiment(t *testing.T) {
 		return func(t *testing.T) {
 			var set feature.Set
 
-			f := feature.Register(&set, "case", "", d)
+			f := set.New("case", "", d)
 
 			got, err := feature.Experiment(context.Background(), f,
 				func(context.Context) (int, error) { return 2, nil },
@@ -226,7 +226,7 @@ func TestCase_Experiment(t *testing.T) {
 
 		set.SetStrategy(feature.Enabled)
 
-		f := feature.Register(&set, "case", "", feature.DefaultDisabled)
+		f := set.New("case", "", feature.DefaultDisabled)
 
 		var equalsCalled bool
 
@@ -250,7 +250,7 @@ func TestCase_Experiment(t *testing.T) {
 
 		set.SetStrategy(feature.Enabled)
 
-		f := feature.Register(&set, "case", "", feature.DefaultDisabled)
+		f := set.New("case", "", feature.DefaultDisabled)
 
 		for _, strategy := range []feature.Strategy{feature.Disabled, feature.Enabled} {
 			var equalsCalled bool
@@ -296,7 +296,7 @@ func TestCase_Experiment(t *testing.T) {
 
 		set.SetStrategy(feature.Enabled)
 
-		f := feature.Register(&set, "case", "", feature.DefaultDisabled)
+		f := set.New("case", "", feature.DefaultDisabled)
 
 		got, err := feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, nil },
@@ -314,7 +314,7 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("FunctionsAreCalledConcurrently", func(t *testing.T) {
 		var set feature.Set
 
-		f := feature.Register(&set, "case", "", feature.DefaultDisabled)
+		f := set.New("case", "", feature.DefaultDisabled)
 
 		ping := make(chan int)
 		pong := make(chan int)
@@ -362,7 +362,7 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("OldError", func(t *testing.T) {
 		var set feature.Set
 
-		f := feature.Register(&set, "case", "", feature.DefaultDisabled)
+		f := set.New("case", "", feature.DefaultDisabled)
 
 		got, err := feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, nil },
@@ -392,7 +392,7 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("PanicInOld", func(t *testing.T) {
 		var set feature.Set
 
-		f := feature.Register(&set, "case", "", feature.DefaultDisabled)
+		f := set.New("case", "", feature.DefaultDisabled)
 
 		got, err := feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, nil },
@@ -422,7 +422,7 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("NewError", func(t *testing.T) {
 		var set feature.Set
 
-		f := feature.Register(&set, "case", "", feature.DefaultDisabled)
+		f := set.New("case", "", feature.DefaultDisabled)
 
 		got, err := feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, errors.New("old failed") },
@@ -452,7 +452,7 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("PanicInNew", func(t *testing.T) {
 		var set feature.Set
 
-		f := feature.Register(&set, "case", "", feature.DefaultDisabled)
+		f := set.New("case", "", feature.DefaultDisabled)
 
 		got, err := feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { panic("old failed") },
@@ -559,7 +559,7 @@ func TestCase_Run(t *testing.T) {
 
 			ctx := context.Background()
 
-			f := feature.Register(&set, "case", "", feature.DefaultDisabled)
+			f := set.New("case", "", feature.DefaultDisabled)
 
 			n, err := feature.Switch(ctx, f,
 				func(ctx context.Context) (int, error) { return testCase.New.N, testCase.New.Error },
@@ -581,7 +581,7 @@ func TestCase_Run_Panic(t *testing.T) {
 
 			ctx := context.Background()
 
-			f := feature.Register(&set, "case", "", feature.DefaultDisabled)
+			f := set.New("case", "", feature.DefaultDisabled)
 
 			n, err := feature.Switch(ctx, f,
 				func(ctx context.Context) (int, error) { return enabled() },
@@ -663,19 +663,19 @@ func TestNewFlag(t *testing.T) {
 func TestRegisterFlag(t *testing.T) {
 	t.Run("FailsOnCaseWithSameName", func(t *testing.T) {
 		var set feature.Set
-		feature.Register(&set, "FailsOnCaseWithSameName", "", feature.DefaultDisabled)
+		set.New("FailsOnCaseWithSameName", "", feature.DefaultDisabled)
 
 		assertPanic(t, func() {
-			feature.Register(&set, "FailsOnCaseWithSameName", "", feature.DefaultDisabled)
+			set.New("FailsOnCaseWithSameName", "", feature.DefaultDisabled)
 		})
 	})
 
 	t.Run("FailsOnDuplicate", func(t *testing.T) {
 		var set feature.Set
-		feature.Register(&set, "FailsOnDuplicate", "", feature.DefaultDisabled)
+		set.New("FailsOnDuplicate", "", feature.DefaultDisabled)
 
 		assertPanic(t, func() {
-			feature.Register(&set, "FailsOnDuplicate", "", feature.DefaultDisabled)
+			set.New("FailsOnDuplicate", "", feature.DefaultDisabled)
 		})
 	})
 }
@@ -683,8 +683,8 @@ func TestRegisterFlag(t *testing.T) {
 func TestFlag_Enabled(t *testing.T) {
 	t.Run("NoStrategy", func(t *testing.T) {
 		var set feature.Set
-		assertDisabled(t, feature.Register(&set, "disabled", "", feature.DefaultDisabled))
-		assertEnabled(t, feature.Register(&set, "enabled", "", feature.DefaultEnabled))
+		assertDisabled(t, set.New("disabled", "", feature.DefaultDisabled))
+		assertEnabled(t, set.New("enabled", "", feature.DefaultEnabled))
 	})
 
 	t.Run("StrategyOnSet", func(t *testing.T) {
@@ -693,9 +693,9 @@ func TestFlag_Enabled(t *testing.T) {
 			"disabled": feature.Enabled,
 			"enabled":  feature.Disabled,
 		})
-		assertEnabled(t, feature.Register(&set, "disabled", "", feature.DefaultDisabled))
-		assertDisabled(t, feature.Register(&set, "enabled", "", feature.DefaultEnabled))
-		assertDisabled(t, feature.Register(&set, "unknown", "", feature.DefaultDisabled))
+		assertEnabled(t, set.New("disabled", "", feature.DefaultDisabled))
+		assertDisabled(t, set.New("enabled", "", feature.DefaultEnabled))
+		assertDisabled(t, set.New("unknown", "", feature.DefaultDisabled))
 	})
 
 	t.Run("Fallback", func(t *testing.T) {
@@ -706,10 +706,10 @@ func TestFlag_Enabled(t *testing.T) {
 			"enabled1":  feature.NoDecision,
 			"enabled3":  feature.NoDecision,
 		})
-		assertDisabled(t, feature.Register(&set, "disabled1", "", feature.DefaultDisabled))
-		assertDisabled(t, feature.Register(&set, "disabled2", "", feature.DefaultEnabled))
-		assertEnabled(t, feature.Register(&set, "enabled1", "", feature.DefaultEnabled))
-		assertEnabled(t, feature.Register(&set, "enabled2", "", feature.DefaultEnabled))
+		assertDisabled(t, set.New("disabled1", "", feature.DefaultDisabled))
+		assertDisabled(t, set.New("disabled2", "", feature.DefaultEnabled))
+		assertEnabled(t, set.New("enabled1", "", feature.DefaultEnabled))
+		assertEnabled(t, set.New("enabled2", "", feature.DefaultEnabled))
 	})
 }
 
@@ -773,7 +773,7 @@ func assertDecision(tb testing.TB, s feature.Strategy, name string, want feature
 
 	var set feature.Set
 
-	f := feature.Register(&set, name, "", "invalid")
+	f := set.New(name, "", "invalid")
 
 	if got := s.Enabled(context.Background(), f); got != want {
 		tb.Errorf("got %q, want %q", got, want)
