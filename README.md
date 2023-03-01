@@ -116,7 +116,7 @@ The `Strategy` interface is defined as follows:
 
 ```go
 type Strategy interface {
-    Enabled(ctx context.Context, name string) Decision
+    Enabled(ctx context.Context, flag *Flag) Decision
 }
 ```
 

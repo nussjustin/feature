@@ -38,7 +38,7 @@ func If(cond bool) Decision {
 // Enabled implements the Strategy.
 //
 // This can be useful when writing custom [Strategy] implementations or in tests.
-func (d Decision) Enabled(context.Context, string) Decision {
+func (d Decision) Enabled(context.Context, *Flag) Decision {
 	return d
 }
 
@@ -402,7 +402,7 @@ func (f *Flag) trace(ctx context.Context, d Decision) {
 //	}
 func (f *Flag) Enabled(ctx context.Context) bool {
 	if s := f.set.strategy.Load(); s != nil {
-		if d := (*s).Enabled(ctx, f.name); d != NoDecision {
+		if d := (*s).Enabled(ctx, f); d != NoDecision {
 			f.trace(ctx, d)
 			return d == Enabled
 		}
@@ -429,14 +429,14 @@ func (f *Flag) Description() string {
 // A Strategy must be safe for concurrent use.
 type Strategy interface {
 	// Enabled takes the name of a feature flag and returns a Decision that determines if the flag should be enabled.
-	Enabled(ctx context.Context, name string) Decision
+	Enabled(ctx context.Context, flag *Flag) Decision
 }
 
 type chainStrategy []Strategy
 
-func (c chainStrategy) Enabled(ctx context.Context, name string) Decision {
+func (c chainStrategy) Enabled(ctx context.Context, flag *Flag) Decision {
 	for _, s := range c {
-		if d := s.Enabled(ctx, name); d != NoDecision {
+		if d := s.Enabled(ctx, flag); d != NoDecision {
 			return d
 		}
 	}
@@ -460,13 +460,13 @@ func chainStrategies(strategies []Strategy) Strategy {
 }
 
 // StrategyFunc implements a [Strategy] by calling itself.
-type StrategyFunc func(ctx context.Context, name string) Decision
+type StrategyFunc func(ctx context.Context, flag *Flag) Decision
 
 var _ Strategy = (StrategyFunc)(nil)
 
 // Enabled implements the [Strategy] interface.
-func (f StrategyFunc) Enabled(ctx context.Context, name string) Decision {
-	return f(ctx, name)
+func (f StrategyFunc) Enabled(ctx context.Context, flag *Flag) Decision {
+	return f(ctx, flag)
 }
 
 // StrategyMap implements a simple [Strategy] using a map of strategies by feature name.
@@ -477,9 +477,9 @@ var _ Strategy = (StrategyMap)(nil)
 // Enabled implements the [Strategy] interface.
 //
 // If a feature with the given name is not found, [NoDecision] is returned.
-func (m StrategyMap) Enabled(ctx context.Context, name string) Decision {
-	if s, ok := m[name]; ok {
-		return s.Enabled(ctx, name)
+func (m StrategyMap) Enabled(ctx context.Context, flag *Flag) Decision {
+	if s, ok := m[flag.Name()]; ok {
+		return s.Enabled(ctx, flag)
 	}
 	return NoDecision
 }

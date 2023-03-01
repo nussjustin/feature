@@ -20,7 +20,7 @@ import (
 )
 
 func ExampleIf() {
-	testerStrategy = feature.StrategyFunc(func(ctx context.Context, _ string) feature.Decision {
+	testerStrategy = feature.StrategyFunc(func(ctx context.Context, _ *feature.Flag) feature.Decision {
 		// Enable all flags for testers
 		return feature.If(IsTester(ctx))
 	})
@@ -88,12 +88,12 @@ func TestSetStrategy(t *testing.T) {
 		return strings.TrimPrefix(s, "TestSetStrategy/")
 	}
 
-	lower := feature.StrategyFunc(func(_ context.Context, name string) feature.Decision {
-		return feature.If(strings.ToLower(trim(name)) == trim(name))
+	lower := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) feature.Decision {
+		return feature.If(strings.ToLower(trim(f.Name())) == trim(f.Name()))
 	})
 
-	upper := feature.StrategyFunc(func(_ context.Context, name string) feature.Decision {
-		return feature.If(strings.ToUpper(trim(name)) == trim(name))
+	upper := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) feature.Decision {
+		return feature.If(strings.ToUpper(trim(f.Name())) == trim(f.Name()))
 	})
 
 	lowerFlag := feature.New("TestSetStrategy/lower", "", feature.DefaultDisabled)
@@ -714,8 +714,8 @@ func TestFlag_Enabled(t *testing.T) {
 }
 
 func TestStrategyFunc_Enabled(t *testing.T) {
-	s := feature.StrategyFunc(func(_ context.Context, name string) feature.Decision {
-		return feature.If(name == "Rob")
+	s := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) feature.Decision {
+		return feature.If(f.Name() == "Rob")
 	})
 
 	assertDecision(t, s, "Brad", feature.Disabled)
@@ -771,7 +771,11 @@ func assertDisabled(tb testing.TB, f *feature.Flag) {
 func assertDecision(tb testing.TB, s feature.Strategy, name string, want feature.Decision) {
 	tb.Helper()
 
-	if got := s.Enabled(context.Background(), name); got != want {
+	var set feature.Set
+
+	f := feature.Register(&set, name, "", "invalid")
+
+	if got := s.Enabled(context.Background(), f); got != want {
 		tb.Errorf("got %q, want %q", got, want)
 	}
 }
