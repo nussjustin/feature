@@ -14,9 +14,10 @@ func TestCase_Experiment_Tracing(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			var set feature.Set
 
+			set.SetStrategy(feature.Enabled)
 			set.SetTracer(tracerCallback(t))
 
-			f := set.New("some flag", "", feature.DefaultEnabled)
+			f := set.New("some flag", "")
 
 			_, _ = feature.Experiment(context.Background(), f,
 				func(context.Context) (int, error) { return enabled() },
@@ -94,7 +95,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		var set feature.Set
 
-		f := set.New("some flag", "", feature.DefaultDisabled)
+		f := set.New("some flag", "")
 
 		set.SetStrategy(feature.Enabled)
 		set.SetTracer(feature.Tracer{
@@ -112,7 +113,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Error", func(t *testing.T) {
 		var set feature.Set
 
-		f := set.New("some flag", "", feature.DefaultDisabled)
+		f := set.New("some flag", "")
 
 		err1, err2 := errors.New("error 1"), errors.New("error 2")
 
@@ -132,7 +133,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 	t.Run("Panic", func(t *testing.T) {
 		var set feature.Set
 
-		f := set.New("some flag", "", feature.DefaultDisabled)
+		f := set.New("some flag", "")
 
 		err := errors.New("error 1")
 
@@ -154,7 +155,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 func TestFlag_Enabled_Tracing(t *testing.T) {
 	var set feature.Set
 
-	flag := set.New("", "", feature.DefaultDisabled)
+	flag := set.New("", "")
 
 	// NoDecision decision
 	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, feature.Disabled)})
@@ -196,6 +197,8 @@ func assertTracedDecision(
 	called := assertCalled(tb, "Decision")
 
 	return func(ctx context.Context, flag *feature.Flag, got feature.Decision) {
+		tb.Helper()
+
 		called()
 
 		if got != want {
@@ -281,6 +284,8 @@ func assertTracedExperiment(
 
 	return func(context.Context, *feature.Flag) (context.Context, func(feature.Decision, any, error, bool)) {
 		return nil, func(gotDecision feature.Decision, got any, gotErr error, gotSuccess bool) {
+			tb.Helper()
+
 			called()
 
 			if gotDecision != wantDecision {

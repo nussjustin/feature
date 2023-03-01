@@ -10,11 +10,10 @@ To define a flag use the global [New](https://pkg.go.dev/github.com/nussjustin/f
 custom [Set](https://pkg.go.dev/github.com/nussjustin/feature#Set),
 [Set.New](https://pkg.go.dev/github.com/nussjustin/feature#Set.New).
 
-`New` takes a name for the flag, an optional description and a default _decision_ (whether the feature should be
-enabled or disabled when no `Strategy` can make a decision).
+`New` takes a name for the flag and an optional description.
 
 ```go
-var newUIFlag = feature.New("new-ui", "enables the new UI", feature.DefaultDisabled)
+var newUIFlag = feature.New("new-ui", "enables the new UI")
 ```
 
 The status of the flag can be checked via the [Enabled](https://pkg.go.dev/github.com/nussjustin/feature#Flag.Enabled)
@@ -42,7 +41,7 @@ builtin tracing functionality.
 To use `Switch` first define a flag:
 
 ```go
-var newUIFlag = feature.New("new-ui", "enables the new UI", feature.DefaultDisabled)
+var newUIFlag = feature.New("new-ui", "enables the new UI")
 ```
 
 Later in your code, just call `Switch` and pass the flag together with 2 callbacks, one for when the flag is enabled and
@@ -92,42 +91,18 @@ Example:
 ```go
 var mySet feature.Set // zero value is valid
 
-var optimizationFlag = mySet.New(
-	"new-ui",
-	"enables the new UI", 
-	nil,
-	feature.DefaultDisabled,
-)
+var optimizationFlag = mySet.New("new-ui", "enables the new UI")
 ```
 
 ### Using dynamic strategies for controlling flags
 
-By default, all flags are enabled or disabled simply based on the
-[DefaultDecision](https://pkg.go.dev/github.com/nussjustin/feature#DefaultDecision) given to `New`.
+By default, all flags are considered disabled.
 
-In many cases such static values are not enough, for example for applications that want to be able to change flags at
-runtime without having to restart the application or when wanting to enable only for some set of operations or users (
-e.g. for A/B testing).
+In order to enable flags, either statically or dynamically, a
+[Strategy](https://pkg.go.dev/github.com/nussjustin/feature#Strategy) must be created an associated with the `Set` using
+`Set.SetStrategy` or, if using the global set, the global `SetStrategy` function.
 
-This can be achieved using a [Strategy](https://pkg.go.dev/github.com/nussjustin/feature#Strategy).
-
-The `Strategy` interface is defined as follows:
-
-```go
-type Strategy interface {
-    Enabled(ctx context.Context, flag *Flag) Decision
-}
-```
-
-By implementing the `Strategy` interface applications can make dynamic decisions for flags.
-
-#### Per set/global `Strategy`
-
-It is also possible to set a per set `Strategy` using the
-[Set.SetStrategy](https://pkg.go.dev/github.com/nussjustin/feature#Set.SetStrategy) method or, when using the global
-set, the global [SetStrategy](https://pkg.go.dev/github.com/nussjustin/feature#SetStrategy) function.
-
-For example:
+Example:
 
 ```go
 func main() {
@@ -142,6 +117,19 @@ func main() {
     mySet.SetStrategy(myCustomStrategy)
 }
 ```
+
+Both the global function and the method take zero or more strategies. If no strategies are given, all flags are
+disabled. Otherwise, the strategies are checked in order until one returns a final decision.
+
+The `Strategy` interface is defined as follows:
+
+```go
+type Strategy interface {
+    Enabled(ctx context.Context, flag *Flag) Decision
+}
+```
+
+### Changing strategies at runtime
 
 The `Strategy` can be changed at any time during runtime. This can be useful for applications that keep cached states
 of all states in memory and periodically receive new states.
@@ -163,14 +151,6 @@ func main() {
 	}()
 }
 ```
-
-#### Order of checks
-
-When checking if a feature flag is enabled, first the `Strategy` associated with the `Flag` is checked.
-
-If the `Strategy` is nil or the result is `Default`, the `Strategy` associated with the set is used.
-
-If this is also nil or the result is also `Default`, the `DefaultDecision` of the `Flag/` is used.
 
 ## Tracing
 

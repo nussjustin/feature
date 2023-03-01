@@ -42,16 +42,6 @@ func (d Decision) Enabled(context.Context, *Flag) Decision {
 	return d
 }
 
-// DefaultDecision is set when creating a [Flag] or [Case] and is used when [NoDecision] is returned by the [Strategy].
-type DefaultDecision string
-
-const (
-	// DefaultDisabled causes flags and cases to treat a NoDecision decision as Disabled.
-	DefaultDisabled DefaultDecision = "disabled"
-	// DefaultEnabled causes flags and cases to treat a NoDecision decision as Enabled.
-	DefaultEnabled DefaultDecision = "enabled"
-)
-
 // Set manages feature flags and can provide a [Strategy] (using [SetStrategy]) for making dynamic decisions about
 // a flags' status.
 //
@@ -69,15 +59,15 @@ var globalSet Set
 // New registers and returns a new [Flag] with the global [Set].
 //
 // See [Set.New] for more details.
-func New(name string, description string, defaultDecision DefaultDecision) *Flag {
-	return globalSet.New(name, description, defaultDecision)
+func New(name string, description string) *Flag {
+	return globalSet.New(name, description)
 }
 
 // New registers and returns a new [Flag] on s.
 //
 // If the given name is already is use by another flag, Register will panic.
-func (s *Set) New(name string, description string, defaultDecision DefaultDecision) *Flag {
-	return s.newFlag(name, description, defaultDecision)
+func (s *Set) New(name string, description string) *Flag {
+	return s.newFlag(name, description)
 }
 
 // SetStrategy sets or removes the [Strategy] for the global [Set].
@@ -152,8 +142,8 @@ func (s *Set) Flags() []*Flag {
 	return fs
 }
 
-func (s *Set) newFlag(name, description string, defaultDecision DefaultDecision) *Flag {
-	f := &Flag{set: s, name: name, description: description, defaultDecision: defaultDecision}
+func (s *Set) newFlag(name, description string) *Flag {
+	f := &Flag{set: s, name: name, description: description}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -372,9 +362,8 @@ func run[T any](ctx context.Context, flag *Flag, d Decision, f func(context.Cont
 type Flag struct {
 	set *Set
 
-	name            string
-	description     string
-	defaultDecision DefaultDecision
+	name        string
+	description string
 }
 
 func (f *Flag) trace(ctx context.Context, d Decision) {
@@ -385,13 +374,7 @@ func (f *Flag) trace(ctx context.Context, d Decision) {
 
 // Enabled returns true if the feature is enabled for the given context.
 //
-// The status of the flag is determined as follows:
-//
-//  1. The [Strategy] of the associated [Set] is checked. If no [Strategy] is set on the [Set] or the [Strategy] returns
-//     [NoDecision], Enabled will continue to the next step.
-//
-//  2. If the previous steps did not result in a final decision ([Enabled] or [Disabled]), the [DefaultDecision] of the
-//     flag is used.
+// If no [Strategy] is defined for the flags [Set] or it returns [NoDecision], Enabled will return false.
 //
 // Example:
 //
@@ -406,10 +389,8 @@ func (f *Flag) Enabled(ctx context.Context) bool {
 		}
 	}
 
-	d := Decision(f.defaultDecision)
-
-	f.trace(ctx, d)
-	return d == Enabled
+	f.trace(ctx, Disabled)
+	return false
 }
 
 // Name returns the name passed to [New] or [Register].
