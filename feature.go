@@ -10,8 +10,8 @@ import (
 
 // Decision is an enum of the potential decisions a [Strategy] can make on whether a [Flag] should be enabled or not.
 //
-// Decision also implements the [Strategy] interface which can be useful when writing custom [Strategy] implementations
-// or tests.
+// By using [FixedDecision] a [Decision] can be used directly as [Strategy]. This can be useful for defining for example
+// a fallback.
 //
 // See the comment on [Decision.Enabled] for more information.
 type Decision string
@@ -25,21 +25,12 @@ const (
 	Enabled Decision = "enabled"
 )
 
-var _ Strategy = NoDecision
-
 // If returns Enabled when the first argument is true, or Disabled otherwise.
 func If(cond bool) Decision {
 	if cond {
 		return Enabled
 	}
 	return Disabled
-}
-
-// Enabled implements the Strategy.
-//
-// This can be useful when writing custom [Strategy] implementations or in tests.
-func (d Decision) Enabled(context.Context, *Flag) Decision {
-	return d
 }
 
 // Set manages feature flags and can provide a [Strategy] (using [SetStrategy]) for making dynamic decisions about
@@ -436,6 +427,22 @@ func chainStrategies(strategies []Strategy) Strategy {
 	}
 
 	return chainStrategy(chain)
+}
+
+type fixedStrategy struct {
+	d Decision
+}
+
+var _ Strategy = fixedStrategy{}
+
+// Enabled implements the Strategy interface.
+func (f fixedStrategy) Enabled(context.Context, *Flag) Decision {
+	return f.d
+}
+
+// FixedStrategy returns a [Strategy] that always returns the given [Decision] d.
+func FixedStrategy(d Decision) Strategy {
+	return fixedStrategy{d}
 }
 
 // StrategyFunc implements a [Strategy] by calling itself.

@@ -29,9 +29,9 @@ func ExampleIf() {
 }
 
 func TestDecision_Enabled(t *testing.T) {
-	assertDecision(t, feature.NoDecision, "", feature.NoDecision)
-	assertDecision(t, feature.Disabled, "", feature.Disabled)
-	assertDecision(t, feature.Enabled, "", feature.Enabled)
+	assertDecision(t, feature.FixedStrategy(feature.NoDecision), "", feature.NoDecision)
+	assertDecision(t, feature.FixedStrategy(feature.Disabled), "", feature.Disabled)
+	assertDecision(t, feature.FixedStrategy(feature.Enabled), "", feature.Enabled)
 }
 
 func ExampleSet_SetStrategy() {
@@ -120,7 +120,7 @@ func TestSetStrategy(t *testing.T) {
 	assertEnabled(t, upperFlag)
 
 	// Test multiple
-	feature.SetStrategy(feature.NoDecision, upper, lower)
+	feature.SetStrategy(feature.FixedStrategy(feature.NoDecision), upper, lower)
 
 	assertDisabled(t, lowerFlag)
 	assertDisabled(t, mixedFlag)
@@ -190,7 +190,7 @@ func TestCase_Experiment(t *testing.T) {
 	newMatchTest := func(want int, equals bool, d feature.Decision) func(*testing.T) {
 		return func(t *testing.T) {
 			var set feature.Set
-			set.SetStrategy(d)
+			set.SetStrategy(feature.FixedStrategy(d))
 
 			f := set.New("case", "")
 
@@ -221,7 +221,7 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("EqualsIsCalledOnSuccess", func(t *testing.T) {
 		var set feature.Set
 
-		set.SetStrategy(feature.Enabled)
+		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
 
 		f := set.New("case", "")
 
@@ -245,11 +245,11 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("EqualsIsNotCalledOnError", func(t *testing.T) {
 		var set feature.Set
 
-		set.SetStrategy(feature.Enabled)
+		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
 
 		f := set.New("case", "")
 
-		for _, strategy := range []feature.Strategy{feature.Disabled, feature.Enabled} {
+		for _, d := range []feature.Decision{feature.Disabled, feature.Enabled} {
 			var equalsCalled bool
 
 			equals := func(new, old int) bool {
@@ -261,7 +261,7 @@ func TestCase_Experiment(t *testing.T) {
 			// function.
 
 			{
-				set.SetStrategy(strategy)
+				set.SetStrategy(feature.FixedStrategy(d))
 
 				_, _ = feature.Experiment(context.Background(), f,
 					func(context.Context) (int, error) { return 2, errors.New("error 2") },
@@ -274,7 +274,7 @@ func TestCase_Experiment(t *testing.T) {
 			}
 
 			{
-				set.SetStrategy(strategy)
+				set.SetStrategy(feature.FixedStrategy(d))
 
 				_, _ = feature.Experiment(context.Background(), f,
 					func(context.Context) (int, error) { return 2, nil },
@@ -291,7 +291,7 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("StrategyIsUsed", func(t *testing.T) {
 		var set feature.Set
 
-		set.SetStrategy(feature.Enabled)
+		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
 
 		f := set.New("case", "")
 
@@ -372,7 +372,7 @@ func TestCase_Experiment(t *testing.T) {
 			t.Errorf("got n = %d, want %d", got, want)
 		}
 
-		set.SetStrategy(feature.Enabled)
+		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
 
 		got, err = feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, nil },
@@ -402,7 +402,7 @@ func TestCase_Experiment(t *testing.T) {
 			t.Errorf("got n = %d, want %d", got, want)
 		}
 
-		set.SetStrategy(feature.Enabled)
+		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
 
 		got, err = feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, nil },
@@ -432,7 +432,7 @@ func TestCase_Experiment(t *testing.T) {
 			t.Errorf("got n = %d, want %d", got, want)
 		}
 
-		set.SetStrategy(feature.Enabled)
+		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
 
 		got, err = feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, errors.New("old failed") },
@@ -462,7 +462,7 @@ func TestCase_Experiment(t *testing.T) {
 			t.Errorf("got n = %d, want %d", got, want)
 		}
 
-		set.SetStrategy(feature.Enabled)
+		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
 
 		got, err = feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { panic("old failed") },
@@ -500,7 +500,7 @@ func TestCase_Run(t *testing.T) {
 
 	testCases := []struct {
 		Name     string
-		Strategy feature.Strategy
+		Decision feature.Decision
 		Old      result
 		New      result
 		Expected result
@@ -512,31 +512,31 @@ func TestCase_Run(t *testing.T) {
 		},
 		{
 			Name:     "Old by default via strategy",
-			Strategy: feature.NoDecision,
+			Decision: feature.NoDecision,
 			Old:      result{N: 1},
 			Expected: result{N: 1},
 		},
 		{
 			Name:     "Old",
-			Strategy: feature.Disabled,
+			Decision: feature.Disabled,
 			Old:      result{N: 1},
 			Expected: result{N: 1},
 		},
 		{
 			Name:     "Old error",
-			Strategy: feature.Disabled,
+			Decision: feature.Disabled,
 			Old:      result{Error: errors.New("test")},
 			Expected: result{Error: errors.New("test")},
 		},
 		{
 			Name:     "New",
-			Strategy: feature.Enabled,
+			Decision: feature.Enabled,
 			New:      result{N: 2},
 			Expected: result{N: 2},
 		},
 		{
 			Name:     "New error",
-			Strategy: feature.Enabled,
+			Decision: feature.Enabled,
 			New:      result{Error: errors.New("test")},
 			Expected: result{Error: errors.New("test")},
 		},
@@ -548,7 +548,7 @@ func TestCase_Run(t *testing.T) {
 		t.Run(testCase.Name, func(t *testing.T) {
 			var set feature.Set
 
-			set.SetStrategy(testCase.Strategy)
+			set.SetStrategy(feature.FixedStrategy(testCase.Decision))
 
 			ctx := context.Background()
 
@@ -682,8 +682,8 @@ func TestFlag_Enabled(t *testing.T) {
 	t.Run("StrategyOnSet", func(t *testing.T) {
 		var set feature.Set
 		set.SetStrategy(feature.StrategyMap{
-			"enabled":  feature.Enabled,
-			"disabled": feature.Disabled,
+			"enabled":  feature.FixedStrategy(feature.Enabled),
+			"disabled": feature.FixedStrategy(feature.Disabled),
 		})
 		assertDisabled(t, set.New("disabled", ""))
 		assertEnabled(t, set.New("enabled", ""))
@@ -693,10 +693,15 @@ func TestFlag_Enabled(t *testing.T) {
 	t.Run("Fallback", func(t *testing.T) {
 		var set feature.Set
 		set.SetStrategy(feature.StrategyMap{
-			"no decision": feature.NoDecision,
+			"no decision": feature.FixedStrategy(feature.NoDecision),
 		})
 		assertDisabled(t, set.New("no decision", ""))
 	})
+}
+
+func TestFixedStrategy(t *testing.T) {
+	assertDecision(t, feature.FixedStrategy(feature.Disabled), "", feature.Disabled)
+	assertDecision(t, feature.FixedStrategy(feature.Enabled), "", feature.Enabled)
 }
 
 func TestStrategyFunc_Enabled(t *testing.T) {
@@ -721,7 +726,7 @@ func ExampleStrategyMap() {
 
 	staticStrategy := make(feature.StrategyMap, len(staticFlags))
 	for name, enabled := range staticFlags {
-		staticStrategy[name] = feature.If(enabled)
+		staticStrategy[name] = feature.FixedStrategy(feature.If(enabled))
 	}
 
 	feature.SetStrategy(staticStrategy)
@@ -729,8 +734,8 @@ func ExampleStrategyMap() {
 
 func TestStrategyMap_Enabled(t *testing.T) {
 	s := feature.StrategyMap{
-		"Brad": feature.Disabled,
-		"Rob":  feature.Enabled,
+		"Brad": feature.FixedStrategy(feature.Disabled),
+		"Rob":  feature.FixedStrategy(feature.Enabled),
 	}
 
 	assertDecision(t, s, "Brad", feature.Disabled)
