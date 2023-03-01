@@ -18,6 +18,9 @@ type Decision string
 
 const (
 	// NoDecision indicates that a Strategy could not make a final Decision for a Flag.
+	//
+	// If this is the final value returned by a Strategy, or no Strategy was found for a Set, Flag.Enabled will behave
+	// as if the Decision was Disabled.
 	NoDecision Decision = "no_decision"
 	// Disabled disables a feature flag and the new code path of the corresponding case.
 	Disabled Decision = "disabled"
