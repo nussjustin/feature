@@ -158,7 +158,7 @@ func TestFlag_Enabled_Tracing(t *testing.T) {
 	flag := set.New("", "")
 
 	// NoDecision decision
-	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, feature.Disabled)})
+	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, feature.NoDecision)})
 	assertDisabled(t, flag)
 
 	set.SetStrategy(feature.FixedStrategy(feature.Enabled))
@@ -197,8 +197,6 @@ func assertTracedDecision(
 	called := assertCalled(tb, "Decision")
 
 	return func(ctx context.Context, flag *feature.Flag, got feature.Decision) {
-		tb.Helper()
-
 		called()
 
 		if got != want {
@@ -284,8 +282,6 @@ func assertTracedExperiment(
 
 	return func(context.Context, *feature.Flag) (context.Context, func(feature.Decision, any, error, bool)) {
 		return nil, func(gotDecision feature.Decision, got any, gotErr error, gotSuccess bool) {
-			tb.Helper()
-
 			called()
 
 			if gotDecision != wantDecision {

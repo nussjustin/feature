@@ -373,15 +373,12 @@ func (f *Flag) trace(ctx context.Context, d Decision) {
 //	   trackUser(ctx, user)
 //	}
 func (f *Flag) Enabled(ctx context.Context) bool {
+	d := NoDecision
 	if s := f.set.strategy.Load(); s != nil {
-		if d := (*s).Enabled(ctx, f); d != NoDecision {
-			f.trace(ctx, d)
-			return d == Enabled
-		}
+		d = (*s).Enabled(ctx, f)
 	}
-
-	f.trace(ctx, Disabled)
-	return false
+	f.trace(ctx, d)
+	return d == Enabled
 }
 
 // Name returns the name passed to [New] or [Register].
