@@ -34,7 +34,7 @@ func TestDecision_Enabled(t *testing.T) {
 	assertDecision(t, feature.FixedStrategy(feature.Enabled), "", feature.Enabled)
 }
 
-func ExampleSet_SetStrategy() {
+func ExampleSetStrategy() {
 	// Read initial configuration from local file
 	flags := readFlags("flags.json")
 
