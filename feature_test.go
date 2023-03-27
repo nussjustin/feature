@@ -141,7 +141,7 @@ func TestSetTracer(t *testing.T) {
 		Decision: func(context.Context, *feature.Flag, feature.Decision) {
 			decisionCount++
 		},
-		Case: func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
+		Branch: func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
 			caseCount++
 			return context.Background(), func(any, error) {}
 		},

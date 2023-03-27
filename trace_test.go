@@ -45,7 +45,7 @@ func TestCase_Experiment_Tracing(t *testing.T) {
 		return func(tb testing.TB) feature.Tracer {
 			return feature.Tracer{
 				Decision:   assertTracedDecision(tb, feature.Enabled),
-				Case:       assertTracedExperimentCases(tb, wantEnabled, wantEnabledErr, wantDisabled, wantDisabledErr),
+				Branch:     assertTracedExperimentCases(tb, wantEnabled, wantEnabledErr, wantDisabled, wantDisabledErr),
 				Experiment: assertTracedExperiment(tb, feature.Enabled, wantEnabled, wantEnabledErr, wantSuccess),
 				Run:        assertNoTracedRun(tb),
 			}
@@ -100,7 +100,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
 		set.SetTracer(feature.Tracer{
 			Decision:   assertTracedDecision(t, feature.Enabled),
-			Case:       assertTracedCase(t, feature.Enabled, 2, nil),
+			Branch:     assertTracedCase(t, feature.Enabled, 2, nil),
 			Experiment: assertNoTracedExperiment(t),
 			Run:        assertTracedRun(t, feature.Enabled, 2, nil),
 		})
@@ -120,7 +120,7 @@ func TestCase_Run_Tracing(t *testing.T) {
 		set.SetStrategy(feature.FixedStrategy(feature.Disabled))
 		set.SetTracer(feature.Tracer{
 			Decision:   assertTracedDecision(t, feature.Disabled),
-			Case:       assertTracedCase(t, feature.Disabled, 1, err1),
+			Branch:     assertTracedCase(t, feature.Disabled, 1, err1),
 			Experiment: assertNoTracedExperiment(t),
 			Run:        assertTracedRun(t, feature.Disabled, 1, err1),
 		})
@@ -139,11 +139,11 @@ func TestCase_Run_Tracing(t *testing.T) {
 
 		set.SetStrategy(feature.FixedStrategy(feature.Disabled))
 		set.SetTracer(feature.Tracer{
-			Decision:     assertTracedDecision(t, feature.Disabled),
-			Case:         assertTracedCase(t, feature.Disabled, 0, err),
-			CasePanicked: assertTracedCasePanic(t, feature.Disabled, err),
-			Experiment:   assertNoTracedExperiment(t),
-			Run:          assertTracedRun(t, feature.Disabled, 0, err),
+			Decision:       assertTracedDecision(t, feature.Disabled),
+			Branch:         assertTracedCase(t, feature.Disabled, 0, err),
+			BranchPanicked: assertTracedCasePanic(t, feature.Disabled, err),
+			Experiment:     assertNoTracedExperiment(t),
+			Run:            assertTracedRun(t, feature.Disabled, 0, err),
 		})
 
 		_, _ = feature.Switch(context.Background(), f,

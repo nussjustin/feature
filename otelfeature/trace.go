@@ -19,11 +19,11 @@ func newTraceTracer(opts *Opts) feature.Tracer {
 	tracer := provider.Tracer(namespace, trace.WithInstrumentationVersion(version))
 
 	return feature.Tracer{
-		Decision:     createTraceDecisionCallback(),
-		Case:         createTraceCaseCallback(tracer),
-		CasePanicked: createTraceCasePanickedCallback(),
-		Experiment:   createTraceExperimentCallback(tracer),
-		Run:          createTraceRunCallback(tracer),
+		Decision:       createTraceDecisionCallback(),
+		Branch:         createTraceCaseCallback(tracer),
+		BranchPanicked: createTraceCasePanickedCallback(),
+		Experiment:     createTraceExperimentCallback(tracer),
+		Run:            createTraceRunCallback(tracer),
 	}
 }
 

@@ -64,17 +64,17 @@ func combineTracers(metric, trace feature.Tracer) feature.Tracer {
 			trace.Decision(ctx, flag, decision)
 			metric.Decision(ctx, flag, decision)
 		},
-		Case: func(ctx context.Context, flag *feature.Flag, decision feature.Decision) (context.Context, func(result any, err error)) {
-			ctx, traceDone := trace.Case(ctx, flag, decision)
-			ctx, metricDone := metric.Case(ctx, flag, decision)
+		Branch: func(ctx context.Context, flag *feature.Flag, decision feature.Decision) (context.Context, func(result any, err error)) {
+			ctx, traceDone := trace.Branch(ctx, flag, decision)
+			ctx, metricDone := metric.Branch(ctx, flag, decision)
 			return ctx, func(result any, err error) {
 				metricDone(result, err)
 				traceDone(result, err)
 			}
 		},
-		CasePanicked: func(ctx context.Context, flag *feature.Flag, decision feature.Decision, panicError *feature.PanicError) {
-			trace.CasePanicked(ctx, flag, decision, panicError)
-			metric.CasePanicked(ctx, flag, decision, panicError)
+		BranchPanicked: func(ctx context.Context, flag *feature.Flag, decision feature.Decision, panicError *feature.PanicError) {
+			trace.BranchPanicked(ctx, flag, decision, panicError)
+			metric.BranchPanicked(ctx, flag, decision, panicError)
 		},
 		Experiment: func(ctx context.Context, flag *feature.Flag) (context.Context, func(d feature.Decision, result any, err error, success bool)) {
 			ctx, traceDone := trace.Experiment(ctx, flag)

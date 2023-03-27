@@ -41,11 +41,11 @@ func newMetricTracer(opts *Opts) (feature.Tracer, error) {
 	}
 
 	return feature.Tracer{
-		Decision:     createMetricDecisionCallback(decisionCounter),
-		Case:         createMetricCaseCallback(caseCounter, caseFailedCounter),
-		CasePanicked: createMetricCasePanickedCallback(caseRecoveredCounter),
-		Experiment:   createMetricExperimentCallback(experimentCounter, experimentErrorsCounter),
-		Run:          createMetricRunCallback(),
+		Decision:       createMetricDecisionCallback(decisionCounter),
+		Branch:         createMetricCaseCallback(caseCounter, caseFailedCounter),
+		BranchPanicked: createMetricCasePanickedCallback(caseRecoveredCounter),
+		Experiment:     createMetricExperimentCallback(experimentCounter, experimentErrorsCounter),
+		Run:            createMetricRunCallback(),
 	}, nil
 }
 

@@ -72,13 +72,13 @@ func TestTracer_Metrics(t *testing.T) {
 		flag := createFlag(t)
 
 		tracer, meter := createTracer(t)
-		_, f1 := tracer.Case(ctx, flag, feature.Disabled)
+		_, f1 := tracer.Branch(ctx, flag, feature.Disabled)
 		f1(nil, nil)
-		_, f2 := tracer.Case(ctx, flag, feature.Enabled)
+		_, f2 := tracer.Branch(ctx, flag, feature.Enabled)
 		f2(nil, errors.New("err2"))
-		_, f3 := tracer.Case(ctx, flag, feature.Enabled)
+		_, f3 := tracer.Branch(ctx, flag, feature.Enabled)
 		f3(nil, nil)
-		_, f4 := tracer.Case(ctx, flag, feature.Disabled)
+		_, f4 := tracer.Branch(ctx, flag, feature.Disabled)
 		f4(nil, nil)
 
 		meter.assertOnly("feature.case", "feature.case.failed")
@@ -107,7 +107,7 @@ func TestTracer_Metrics(t *testing.T) {
 		flag := createFlag(t)
 
 		tracer, meter := createTracer(t)
-		tracer.CasePanicked(ctx, flag, feature.Enabled, &feature.PanicError{})
+		tracer.BranchPanicked(ctx, flag, feature.Enabled, &feature.PanicError{})
 
 		meter.assertOnly("feature.case.recovered")
 

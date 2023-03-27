@@ -22,9 +22,9 @@ const (
 	// If this is the final value returned by a Strategy, or no Strategy was found for a Set, Flag.Enabled will behave
 	// as if the Decision was Disabled.
 	NoDecision Decision = "no_decision"
-	// Disabled disables a feature flag and the new code path of the corresponding case.
+	// Disabled disables a feature flag and the new code path of the corresponding branch.
 	Disabled Decision = "disabled"
-	// Enabled enables a feature flag and the new code path of the corresponding case.
+	// Enabled enables a feature flag and the new code path of the corresponding branch.
 	Enabled Decision = "enabled"
 )
 
@@ -167,26 +167,26 @@ type Tracer struct {
 	// Decision is called every time [Flag.Enabled] is called.
 	Decision func(context.Context, *Flag, Decision)
 
-	// Case is called for each called function during [Experiment] as well as for the function called by [Switch].
+	// Branch is called for each called function during [Experiment] as well as for the function called by [Switch].
 	//
 	// The returned function is called after the called function has returned with the values returned by the function.
 	//
 	// The returned function can be nil.
-	Case func(context.Context, *Flag, Decision) (context.Context, func(result any, err error))
+	Branch func(context.Context, *Flag, Decision) (context.Context, func(result any, err error))
 
-	// CasePanicked is called when a panic was caught as part of a function called by a [Case].
-	CasePanicked func(ctx context.Context, flag *Flag, decision Decision, panicError *PanicError)
+	// BranchPanicked is called when a panic was caught as part of a function called by a [Case].
+	BranchPanicked func(ctx context.Context, flag *Flag, decision Decision, panicError *PanicError)
 
-	// Experiment is called at the beginning of every call to [Case.Experiment].
+	// Experiment is called at the beginning of every call to [Experiment].
 	//
-	// The returned function is called after both functions given to [Case.Experiment] have returned and is passed
+	// The returned function is called after both functions given to [Experiment] have returned and is passed
 	// the [Decision] made by the given [Flag] and the values that will be returned as well as a boolean that indicates
 	// if the experiment was successful (the results were equal and no errors occurred).
 	//
 	// The returned function can be nil.
 	Experiment func(context.Context, *Flag) (context.Context, func(d Decision, result any, err error, success bool))
 
-	// Run is called at the beginning of every call to [Case.Switch].
+	// Run is called at the beginning of every call to [Switch].
 	//
 	// The returned function is called with the [Decision] made by the given [Flag] as well and the result that will
 	// be returned.
@@ -197,7 +197,7 @@ type Tracer struct {
 
 // Equals returns a function that compares to values of the same type using ==.
 //
-// This can be used with [Case.Experiment] when T is a comparable type.
+// This can be used with [Experiment] when T is a comparable type.
 func Equals[T comparable](a, b T) bool {
 	return a == b
 }
@@ -303,15 +303,15 @@ func Switch[T any](ctx context.Context, flag *Flag,
 
 	enabled := flag.Enabled(ctx)
 
-	fn := ifDisabled
+	fn, d := ifDisabled, Disabled
 	if enabled {
-		fn = ifEnabled
+		fn, d = ifEnabled, Enabled
 	}
 
-	resultT, err := run(ctx, flag, If(enabled), fn)
+	resultT, err := run(ctx, flag, d, fn)
 
 	if done != nil {
-		done(If(enabled), resultT, err)
+		done(d, resultT, err)
 	}
 
 	return resultT, err
@@ -320,9 +320,9 @@ func Switch[T any](ctx context.Context, flag *Flag,
 func run[T any](ctx context.Context, flag *Flag, d Decision, f func(context.Context) (T, error)) (result T, err error) {
 	t := flag.set.getTracer()
 
-	if t.Case != nil {
+	if t.Branch != nil {
 		var done func(any, error)
-		ctx, done = t.Case(ctx, flag, d)
+		ctx, done = t.Branch(ctx, flag, d)
 
 		if done != nil {
 			defer func() { done(result, err) }()
@@ -333,8 +333,8 @@ func run[T any](ctx context.Context, flag *Flag, d Decision, f func(context.Cont
 		if v := recover(); v != nil {
 			panicErr := &PanicError{Recovered: v}
 
-			if t.CasePanicked != nil {
-				t.CasePanicked(ctx, flag, d, panicErr)
+			if t.BranchPanicked != nil {
+				t.BranchPanicked(ctx, flag, d, panicErr)
 			}
 
 			err = panicErr

@@ -56,7 +56,7 @@ func TestTracer_Tracing(t *testing.T) {
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
 			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
-			_, done := tracer.Case(context.Background(), flag, feature.Enabled)
+			_, done := tracer.Branch(context.Background(), flag, feature.Enabled)
 			done(nil, nil)
 
 			recordedSpan := getSpan(t, spanRecorder, "Enabled")
@@ -72,7 +72,7 @@ func TestTracer_Tracing(t *testing.T) {
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
 			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
-			_, done := tracer.Case(context.Background(), flag, feature.Disabled)
+			_, done := tracer.Branch(context.Background(), flag, feature.Disabled)
 			done(nil, errors.New("some error"))
 
 			recordedSpan := getSpan(t, spanRecorder, "Disabled")
@@ -90,7 +90,7 @@ func TestTracer_Tracing(t *testing.T) {
 		tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
 		ctx, span := provider.Tracer("").Start(context.Background(), "test")
-		tracer.CasePanicked(ctx, flag, feature.Enabled, &feature.PanicError{
+		tracer.BranchPanicked(ctx, flag, feature.Enabled, &feature.PanicError{
 			Recovered: "hello world",
 		})
 		span.End()
