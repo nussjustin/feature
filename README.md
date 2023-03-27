@@ -134,8 +134,8 @@ type Strategy interface {
 The `Strategy` can be changed at any time during runtime. This can be useful for applications that keep cached states
 of all states in memory and periodically receive new states.
 
-For cases like this the [StrategyMap](https://pkg.go.dev/github.com/nussjustin/feature#StrategyMap) type can be useful,
-which delegates the check for each flag to a different `Strategy` based on the name of the feature.
+For cases like this the [DecisionMap](https://pkg.go.dev/github.com/nussjustin/feature#DecisionMap) type can be useful,
+which returns a static `Decision` for each flag based on its name.
 
 Example:
 

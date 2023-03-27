@@ -38,7 +38,7 @@ func ExampleSetStrategy() {
 	// Read initial configuration from local file
 	flags := readFlags("flags.json")
 
-	feature.SetStrategy(feature.StrategyMap(flags))
+	feature.SetStrategy(feature.DecisionMap(flags))
 
 	go func() {
 		// Reload flags on SIGUSR1
@@ -48,7 +48,7 @@ func ExampleSetStrategy() {
 		for range signals {
 			flags := readFlags("flags.json")
 
-			feature.SetStrategy(feature.StrategyMap(flags))
+			feature.SetStrategy(feature.DecisionMap(flags))
 		}
 	}()
 
@@ -681,9 +681,9 @@ func TestFlag_Enabled(t *testing.T) {
 
 	t.Run("StrategyOnSet", func(t *testing.T) {
 		var set feature.Set
-		set.SetStrategy(feature.StrategyMap{
-			"enabled":  feature.FixedStrategy(feature.Enabled),
-			"disabled": feature.FixedStrategy(feature.Disabled),
+		set.SetStrategy(feature.DecisionMap{
+			"enabled":  feature.Enabled,
+			"disabled": feature.Disabled,
 		})
 		assertDisabled(t, set.New("disabled", ""))
 		assertEnabled(t, set.New("enabled", ""))
@@ -692,8 +692,8 @@ func TestFlag_Enabled(t *testing.T) {
 
 	t.Run("Fallback", func(t *testing.T) {
 		var set feature.Set
-		set.SetStrategy(feature.StrategyMap{
-			"no decision": feature.FixedStrategy(feature.NoDecision),
+		set.SetStrategy(feature.DecisionMap{
+			"no decision": feature.NoDecision,
 		})
 		assertDisabled(t, set.New("no decision", ""))
 	})
@@ -713,7 +713,7 @@ func TestStrategyFunc_Enabled(t *testing.T) {
 	assertDecision(t, s, "Rob", feature.Enabled)
 }
 
-func ExampleStrategyMap() {
+func ExampleDecisionMap() {
 	staticFlagsJSON, err := os.ReadFile("flags.json")
 	if err != nil {
 		log.Fatalf("failed to read flags JSON: %s", err)
@@ -724,18 +724,18 @@ func ExampleStrategyMap() {
 		log.Fatalf("failed to parse flags JSON: %s", err)
 	}
 
-	staticStrategy := make(feature.StrategyMap, len(staticFlags))
+	strategy := make(feature.DecisionMap, len(staticFlags))
 	for name, enabled := range staticFlags {
-		staticStrategy[name] = feature.FixedStrategy(feature.If(enabled))
+		strategy[name] = feature.If(enabled)
 	}
 
-	feature.SetStrategy(staticStrategy)
+	feature.SetStrategy(strategy)
 }
 
-func TestStrategyMap_Enabled(t *testing.T) {
-	s := feature.StrategyMap{
-		"Brad": feature.FixedStrategy(feature.Disabled),
-		"Rob":  feature.FixedStrategy(feature.Enabled),
+func TestDecisionMap_Enabled(t *testing.T) {
+	s := feature.DecisionMap{
+		"Brad": feature.Disabled,
+		"Rob":  feature.Enabled,
 	}
 
 	assertDecision(t, s, "Brad", feature.Disabled)

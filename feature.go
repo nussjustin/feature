@@ -36,6 +36,21 @@ func If(cond bool) Decision {
 	return Disabled
 }
 
+// DecisionMap implements a simple [Strategy] that returns a fixed value for each flag by its name.
+type DecisionMap map[string]Decision
+
+var _ Strategy = (DecisionMap)(nil)
+
+// Enabled implements the [Strategy] interface.
+//
+// If a feature with the given name is not found, [NoDecision] is returned.
+func (m DecisionMap) Enabled(ctx context.Context, flag *Flag) Decision {
+	if d, ok := m[flag.Name()]; ok {
+		return d
+	}
+	return NoDecision
+}
+
 // Set manages feature flags and can provide a [Strategy] (using [SetStrategy]) for making dynamic decisions about
 // a flags' status.
 //
@@ -453,19 +468,4 @@ var _ Strategy = (StrategyFunc)(nil)
 // Enabled implements the [Strategy] interface.
 func (f StrategyFunc) Enabled(ctx context.Context, flag *Flag) Decision {
 	return f(ctx, flag)
-}
-
-// StrategyMap implements a simple [Strategy] using a map of strategies by feature name.
-type StrategyMap map[string]Strategy
-
-var _ Strategy = (StrategyMap)(nil)
-
-// Enabled implements the [Strategy] interface.
-//
-// If a feature with the given name is not found, [NoDecision] is returned.
-func (m StrategyMap) Enabled(ctx context.Context, flag *Flag) Decision {
-	if s, ok := m[flag.Name()]; ok {
-		return s.Enabled(ctx, flag)
-	}
-	return NoDecision
 }
