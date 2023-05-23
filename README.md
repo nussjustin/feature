@@ -50,7 +50,7 @@ one for when it is not.
 ```go
 tmpl, err := feature.Switch(ctx, newUIFlag, 
 	func(context.Context) (*template.Template, error) { return template.Parse("new-ui/*.gotmpl") },
-    func(context.Context) (*template.Template, error) { return template.Parse("old-ui/*.gotmpl") })
+	func(context.Context) (*template.Template, error) { return template.Parse("old-ui/*.gotmpl") })
 ```
 
 ### Running an experiment
@@ -176,12 +176,8 @@ func main() {
 
 ### OpenTelemetry integration
 
-# TODO: Document metrics
-
-The `otelfeature` package found at
-[github.com/nussjustin/feature/otelfeature](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature) exposes a
-function that returns pre-configured `Tracer` that implements basic metrics and tracing for `Flag`s as well as the
-global `Switch` and `Experiment` functions using [OpenTelemetry](https://opentelemetry.io/).
+The `otelfeature` package exposes a function that returns pre-configured `Tracer` that implements basic metrics and
+tracing for `Flag`s as well as the global `Switch` and `Experiment` functions using [OpenTelemetry](https://opentelemetry.io/).
 
 In order to enable metrics collection and tracing use the global
 [otelfeature.Tracer](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature#Tracer) function to create a new
