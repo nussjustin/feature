@@ -477,7 +477,7 @@ func TestCase_Experiment(t *testing.T) {
 	})
 }
 
-func ExampleRun() {
+func ExampleSwitch() {
 	optimizationFlag := feature.New("optimize-posts-loading", "enables new query for loading posts")
 
 	// later
