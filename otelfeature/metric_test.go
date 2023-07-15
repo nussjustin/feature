@@ -8,7 +8,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/metric/instrument"
+	"go.opentelemetry.io/otel/metric/embedded"
 
 	"github.com/nussjustin/feature"
 	"github.com/nussjustin/feature/otelfeature"
@@ -174,18 +174,19 @@ func TestTracer_Metrics(t *testing.T) {
 
 type testInt64CounterAdded struct {
 	incr  int64
-	attrs []attribute.KeyValue
+	attrs attribute.Set
 }
 
 type testInt64Counter struct {
-	instrument.Int64Counter
+	metric.Int64Counter
 	tb   testing.TB
 	name string
 
 	added []*testInt64CounterAdded
 }
 
-func (t *testInt64Counter) Add(_ context.Context, incr int64, attrs ...attribute.KeyValue) {
+func (t *testInt64Counter) Add(_ context.Context, incr int64, options ...metric.AddOption) {
+	attrs := metric.NewAddConfig(options).Attributes()
 	t.added = append(t.added, &testInt64CounterAdded{incr, attrs})
 }
 
@@ -224,7 +225,7 @@ type testMeter struct {
 	int64Counters map[string]*testInt64Counter
 }
 
-func (t *testMeter) Int64Counter(name string, _ ...instrument.Int64Option) (instrument.Int64Counter, error) {
+func (t *testMeter) Int64Counter(name string, _ ...metric.Int64CounterOption) (metric.Int64Counter, error) {
 	if t.int64Counters == nil {
 		t.int64Counters = make(map[string]*testInt64Counter)
 	}
@@ -249,6 +250,7 @@ func (t *testMeter) assertOnly(expected ...string) {
 }
 
 type testMeterProvider struct {
+	embedded.MeterProvider
 	meter *testMeter
 	tb    testing.TB
 }
@@ -269,25 +271,21 @@ func contains[T comparable](set []T, value T) bool {
 	return false
 }
 
-func containsAll[T comparable](set []T, values []T) bool {
-	if len(values) == 0 {
+func containsAll(set attribute.Set, attrs []attribute.KeyValue) bool {
+	if len(attrs) == 0 {
 		return true
 	}
 
-	if len(values) > len(set) {
+	if len(attrs) > set.Len() {
 		return false
 	}
 
-	seen := make(map[T]bool, len(set))
-
-	for i := range set {
-		seen[set[i]] = true
-	}
-
-	for _, value := range values {
-		if !seen[value] {
+	for _, attr := range attrs {
+		got, ok := set.Value(attr.Key)
+		if !ok || got.Emit() != attr.Value.Emit() {
 			return false
 		}
+
 	}
 
 	return true
