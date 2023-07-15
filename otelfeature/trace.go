@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nussjustin/feature"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/nussjustin/feature"
 )
 
 func newTraceTracer(opts *Opts) feature.Tracer {

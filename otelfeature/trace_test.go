@@ -5,12 +5,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/nussjustin/feature"
-	"github.com/nussjustin/feature/otelfeature"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+
+	"github.com/nussjustin/feature"
+	"github.com/nussjustin/feature/otelfeature"
 )
 
 func TestTracer_Tracing(t *testing.T) {

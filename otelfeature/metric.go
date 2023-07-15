@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/nussjustin/feature"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/global"
 	"go.opentelemetry.io/otel/metric/instrument"
+
+	"github.com/nussjustin/feature"
 )
 
 func newMetricTracer(opts *Opts) (feature.Tracer, error) {

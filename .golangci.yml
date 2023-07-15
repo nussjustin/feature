@@ -45,6 +45,14 @@ linters:
     - tparallel
     - unconvert
     - wastedassign
+linters-settings:
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/nussjustin/feature)
+      - blank
+      - dot
 run:
   skip-files:
     - _test.go$

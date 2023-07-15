@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nussjustin/feature"
-	"github.com/nussjustin/feature/otelfeature"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/instrument"
+
+	"github.com/nussjustin/feature"
+	"github.com/nussjustin/feature/otelfeature"
 )
 
 func TestTracer_Metrics(t *testing.T) {

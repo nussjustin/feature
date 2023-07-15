@@ -3,10 +3,11 @@ package otelfeature
 import (
 	"context"
 
-	"github.com/nussjustin/feature"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/nussjustin/feature"
 )
 
 const (
