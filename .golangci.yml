@@ -1,29 +1,50 @@
 linters:
-  enable-all: true
-  disable:
-    - cyclop
-    - deadcode
-    - exhaustivestruct
-    - exhaustruct
-    - gochecknoglobals
-    - gocyclo
-    - godox
-    - golint
-    - ifshort
-    - interfacer
-    - ireturn # reports generic types as interfaces
-    - lll
-    - maligned
-    - nlreturn
-    - nonamedreturns
-    - nosnakecase
-    - predeclared
-    - scopelint
-    - structcheck
-    - varcheck
-    - varnamelen
-    - wrapcheck
-    - wsl
+  enable:
+    # Default linters, specified for clarity
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    # Custom linters
+    - asasalint
+    - bodyclose
+    - contextcheck
+    - dupl
+    - dupword
+    - durationcheck
+    - errchkjson
+    - exhaustive
+    - exportloopref
+    - gci
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - goconst
+    - godot
+    - gofumpt
+    - gomnd
+    - gosec
+    - gosmopolitan
+    - loggercheck
+    - makezero
+    - misspell
+    - musttag
+    - nilerr
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - prealloc
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - tagalign
+    - tagliatelle
+    - testpackage
+    - thelper
+    - tparallel
+    - unconvert
+    - wastedassign
 run:
   skip-files:
     - _test.go$

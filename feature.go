@@ -44,7 +44,7 @@ var _ Strategy = (DecisionMap)(nil)
 // Enabled implements the [Strategy] interface.
 //
 // If a feature with the given name is not found, [NoDecision] is returned.
-func (m DecisionMap) Enabled(ctx context.Context, flag *Flag) Decision {
+func (m DecisionMap) Enabled(_ context.Context, flag *Flag) Decision {
 	if d, ok := m[flag.Name()]; ok {
 		return d
 	}

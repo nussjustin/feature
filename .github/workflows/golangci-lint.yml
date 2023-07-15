@@ -1,7 +1,7 @@
 on: [push, pull_request]
 name: Lint
 jobs:
-  test:
+  lint:
     strategy:
       matrix:
         go-version: [1.20.x]
@@ -16,4 +16,4 @@ jobs:
         uses: actions/checkout@v3
       - name: Lint
         run: |
-          go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.1 run
+          go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3 run
