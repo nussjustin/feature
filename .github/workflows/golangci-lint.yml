@@ -8,12 +8,10 @@ jobs:
         platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
-      - name: Checkout code
-        uses: actions/checkout@v3
       - name: Lint
         run: |
-          go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3 run
+          go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.1 run
