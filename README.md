@@ -142,8 +142,10 @@ func main() {
 }
 ```
 
-Both the global function and the method take zero or more strategies. If no strategies are given, all flags are
-disabled. Otherwise, the strategies are checked in order until one returns a final decision.
+Both the global function and the method take one or more strategies. If all strategies are nil, checking a `Flag` will
+only use the default `Decision` set via `Config.Default`, which defaults to `Disabled`.
+
+Otherwise, all non-nil strategies are checked in order until one returns a final decision.
 
 The `Strategy` interface is defined as follows:
 
