@@ -136,6 +136,13 @@ func TestSetStrategy(t *testing.T) {
 	assertEnabled(t, lowerFlag)
 	assertDisabled(t, mixedFlag)
 	assertDisabled(t, upperFlag)
+
+	// A bunch of nils should work
+	feature.SetStrategy(nil, nil, nil)
+
+	assertDisabled(t, lowerFlag)
+	assertDisabled(t, mixedFlag)
+	assertDisabled(t, upperFlag)
 }
 
 func TestSetTracer(t *testing.T) {
