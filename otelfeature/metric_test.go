@@ -15,10 +15,6 @@ import (
 )
 
 func TestTracer_Metrics(t *testing.T) {
-	createFlag := func(tb testing.TB) *feature.Flag {
-		return (&feature.Set{}).New(tb.Name(), "")
-	}
-
 	createTracer := func(tb testing.TB) (feature.Tracer, *testMeter) {
 		tb.Helper()
 
@@ -49,7 +45,7 @@ func TestTracer_Metrics(t *testing.T) {
 	})
 
 	t.Run("Decision", func(t *testing.T) {
-		flag := createFlag(t)
+		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
 		tracer.Decision(ctx, flag, feature.Disabled)
@@ -70,7 +66,7 @@ func TestTracer_Metrics(t *testing.T) {
 	})
 
 	t.Run("Case", func(t *testing.T) {
-		flag := createFlag(t)
+		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
 		_, f1 := tracer.Branch(ctx, flag, feature.Disabled)
@@ -105,7 +101,7 @@ func TestTracer_Metrics(t *testing.T) {
 	})
 
 	t.Run("Case Panicked", func(t *testing.T) {
-		flag := createFlag(t)
+		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
 		tracer.BranchPanicked(ctx, flag, feature.Enabled, &feature.PanicError{})
@@ -120,7 +116,7 @@ func TestTracer_Metrics(t *testing.T) {
 	})
 
 	t.Run("Experiment", func(t *testing.T) {
-		flag := createFlag(t)
+		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
 		_, f1 := tracer.Experiment(ctx, flag)
@@ -163,7 +159,7 @@ func TestTracer_Metrics(t *testing.T) {
 	})
 
 	t.Run("Switch", func(t *testing.T) {
-		flag := createFlag(t)
+		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
 		tracer.Run(ctx, flag)

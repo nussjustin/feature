@@ -8,12 +8,24 @@ import (
 	"sync/atomic"
 )
 
+// Config contains configuration for a feature flag including the flag name and a description.
+type Config struct {
+	// Flag defines the name for the flag used for this feature.
+	Flag string
+
+	// Description contains an optional, human-readable description of the feature.
+	Description string
+
+	// Default defines the default [Decision] (status) for this flag if no strategy was set or no final decision was made.
+	//
+	// An empty value is treated as [NoDecision].
+	Default Decision
+}
+
 // Decision is an enum of the potential decisions a [Strategy] can make on whether a [Flag] should be enabled or not.
 //
-// By using [FixedDecision] a [Decision] can be used directly as [Strategy]. This can be useful for defining for example
-// a fallback.
-//
-// See the comment on [Decision.Enabled] for more information.
+// Through the global [FixedStrategy] function, a [Decision] can be used directly as [Strategy], which can be useful
+// for defining a global fallback.
 type Decision string
 
 const (
@@ -68,15 +80,15 @@ var globalSet Set
 // New registers and returns a new [Flag] with the global [Set].
 //
 // See [Set.New] for more details.
-func New(name string, description string) *Flag {
-	return globalSet.New(name, description)
+func New(c Config) *Flag {
+	return globalSet.New(c)
 }
 
 // New registers and returns a new [Flag] on s.
 //
 // If the given name is already is use by another flag, Register will panic.
-func (s *Set) New(name string, description string) *Flag {
-	return s.newFlag(name, description)
+func (s *Set) New(c Config) *Flag {
+	return s.newFlag(c)
 }
 
 // SetStrategy sets or removes the [Strategy] for the global [Set].
@@ -151,8 +163,12 @@ func (s *Set) Flags() []*Flag {
 	return fs
 }
 
-func (s *Set) newFlag(name, description string) *Flag {
-	f := &Flag{set: s, name: name, description: description}
+func (s *Set) newFlag(c Config) *Flag {
+	if c.Default == "" {
+		c.Default = NoDecision
+	}
+
+	f := &Flag{set: s, name: c.Flag, description: c.Description, decision: c.Default}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -161,11 +177,11 @@ func (s *Set) newFlag(name, description string) *Flag {
 		s.flags = map[string]*Flag{}
 	}
 
-	if _, ok := s.flags[name]; ok {
-		panic(fmt.Sprintf("name %q already in use", name))
+	if _, ok := s.flags[c.Flag]; ok {
+		panic(fmt.Sprintf("name %q already in use", c.Flag))
 	}
 
-	s.flags[name] = f
+	s.flags[c.Flag] = f
 
 	return f
 }
@@ -373,6 +389,7 @@ type Flag struct {
 
 	name        string
 	description string
+	decision    Decision
 }
 
 func (f *Flag) trace(ctx context.Context, d Decision) {
@@ -383,7 +400,8 @@ func (f *Flag) trace(ctx context.Context, d Decision) {
 
 // Enabled returns true if the feature is enabled for the given context.
 //
-// If no [Strategy] is defined for the flags [Set] or it returns [NoDecision], Enabled will return false.
+// A feature is considered enabled when the final [Decision], made by considering the [Strategy] set on the [Set] and
+// the default [Decision] configured for the [Flag], is [Enabled].
 //
 // Example:
 //
@@ -395,18 +413,26 @@ func (f *Flag) Enabled(ctx context.Context) bool {
 	if s := f.set.strategy.Load(); s != nil {
 		d = (*s).Enabled(ctx, f)
 	}
+	if d == NoDecision {
+		d = f.Default()
+	}
 	f.trace(ctx, d)
 	return d == Enabled
 }
 
-// Name returns the name passed to [New] or [Register].
+// Name returns the name of the feature flag.
 func (f *Flag) Name() string {
 	return f.name
 }
 
-// Description returns the description passed to [New] or [Register].
+// Description returns the description of the defined feature.
 func (f *Flag) Description() string {
 	return f.description
+}
+
+// Default returns the default decision configured for this feature.
+func (f *Flag) Default() Decision {
+	return f.decision
 }
 
 // Strategy defines an interface used for deciding on whether a feature is enabled or not.
