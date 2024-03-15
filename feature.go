@@ -376,12 +376,9 @@ func run[T any](ctx context.Context, flag *Flag, d Decision, f func(context.Cont
 }
 
 // Flag represents a feature flag that can be enabled or disabled (toggled) dynamically at runtime and used to control
-// the behaviour of an application, for example by dynamically changing code paths (see [Case]).
+// the behaviour of an application, for example by dynamically changing code paths (see [Experiment] and [Switch]).
 //
-// In many cases a [Case] can be used to simplify working with a [Flag]. See the documentation and examples for [Case]
-// for more information on how to use a [Case].
-//
-// A Flag must be obtained using either [New] or [Register].
+// A Flag must be obtained using either [New] or [Set.New].
 //
 // The zero value is not valid.
 type Flag struct {
