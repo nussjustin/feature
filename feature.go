@@ -3,6 +3,7 @@ package feature
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -16,12 +17,12 @@ type Config struct {
 	// Description contains an optional, human-readable description of the feature.
 	Description string
 
+	// Labels can be used to add additional metadata to a feature.
+	Labels map[string]string
+
 	// DefaultEnabled, if true, causes the feature to be enabled by default when no explicit defaultDecision can be made for
 	// (either because no [Strategy] was set or because the final defaultDecision was [NoDecision]).
 	DefaultEnabled bool
-
-	// Labels can be used to add additional metadata to a feature.
-	Labels map[string]string
 }
 
 // Decision is an enum of the potential decisions a [Strategy] can make on whether a [Flag] should be enabled or not.
@@ -170,7 +171,13 @@ func (s *Set) Flags() []*Flag {
 }
 
 func (s *Set) newFlag(c Config) *Flag {
-	f := &Flag{set: s, name: c.Name, description: c.Description, defaultDecision: If(c.DefaultEnabled)}
+	f := &Flag{
+		set:             s,
+		name:            c.Name,
+		description:     c.Description,
+		defaultDecision: If(c.DefaultEnabled),
+		labels:          maps.Clone(c.Labels),
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -389,6 +396,7 @@ type Flag struct {
 	name            string
 	description     string
 	defaultDecision Decision
+	labels          map[string]string
 }
 
 func (f *Flag) trace(ctx context.Context, d Decision) {
@@ -427,6 +435,11 @@ func (f *Flag) Name() string {
 // Description returns the description of the defined feature.
 func (f *Flag) Description() string {
 	return f.description
+}
+
+// Labels returns the labels associated with this feature.
+func (f *Flag) Labels() map[string]string {
+	return maps.Clone(f.labels)
 }
 
 // Default returns the default defaultDecision configured for this feature.

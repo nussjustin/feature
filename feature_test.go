@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"maps"
 	"net/http"
 	"os"
 	"os/signal"
@@ -687,6 +688,27 @@ func TestRegisterFlag(t *testing.T) {
 			set.New(named("FailsOnDuplicate"))
 		})
 	})
+}
+
+func TestFlag_Labels(t *testing.T) {
+	var set feature.Set
+
+	f := set.New(feature.Config{
+		Name:   t.Name(),
+		Labels: map[string]string{"a": "b"},
+	})
+
+	if !maps.Equal(map[string]string{"a": "b"}, f.Labels()) {
+		t.Error("flag labels do not match configured labels")
+	}
+
+	m := f.Labels()
+	delete(m, "a")
+	m["c"] = "d"
+
+	if !maps.Equal(map[string]string{"a": "b"}, f.Labels()) {
+		t.Error("flag labels were modified")
+	}
 }
 
 func TestFlag_Enabled(t *testing.T) {
