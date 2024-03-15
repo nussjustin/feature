@@ -69,7 +69,7 @@ func (m DecisionMap) Enabled(_ context.Context, flag *Flag) Decision {
 // Set manages feature flags and can provide a [Strategy] (using [SetStrategy]) for making dynamic decisions about
 // a flags' status.
 //
-// The zero value is usable as is, using the default defaultDecision for each flag.
+// The zero value is usable as is, defaulting to all flags being disabled unless [Config.DefaultEnabled] is set.
 type Set struct {
 	strategy atomic.Pointer[Strategy]
 	tracer   atomic.Pointer[Tracer]
