@@ -16,10 +16,9 @@ type Config struct {
 	// Description contains an optional, human-readable description of the feature.
 	Description string
 
-	// Default defines the default [Decision] (status) for this flag if no strategy was set or no final decision was made.
-	//
-	// An empty value is treated as [NoDecision].
-	Default Decision
+	// DefaultEnabled, if true, causes the feature to be enabled by default when no explicit defaultDecision can be made for
+	// (either because no [Strategy] was set or because the final defaultDecision was [NoDecision]).
+	DefaultEnabled bool
 
 	// Labels can be used to add additional metadata to a feature.
 	Labels map[string]string
@@ -69,7 +68,7 @@ func (m DecisionMap) Enabled(_ context.Context, flag *Flag) Decision {
 // Set manages feature flags and can provide a [Strategy] (using [SetStrategy]) for making dynamic decisions about
 // a flags' status.
 //
-// The zero value is usable as is, using the default decision for each flag.
+// The zero value is usable as is, using the default defaultDecision for each flag.
 type Set struct {
 	strategy atomic.Pointer[Strategy]
 	tracer   atomic.Pointer[Tracer]
@@ -167,11 +166,7 @@ func (s *Set) Flags() []*Flag {
 }
 
 func (s *Set) newFlag(c Config) *Flag {
-	if c.Default == "" {
-		c.Default = NoDecision
-	}
-
-	f := &Flag{set: s, name: c.Name, description: c.Description, decision: c.Default}
+	f := &Flag{set: s, name: c.Name, description: c.Description, defaultDecision: If(c.DefaultEnabled)}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -189,10 +184,10 @@ func (s *Set) newFlag(c Config) *Flag {
 	return f
 }
 
-// Tracer can be used to trace the use of both [Case] and [Flag] types for example to implement tracing or to collect
-// metrics.
+// Tracer can be used to trace the use of calls to [Flag.Enabled] as well as the global helper functions [Experiment]
+// and [Switch].
 //
-// See the documentation of the fields for information on what can be traced.
+// See the documentation on each field for information on what can be traced.
 //
 // All fields are optional.
 //
@@ -387,9 +382,9 @@ func run[T any](ctx context.Context, flag *Flag, d Decision, f func(context.Cont
 type Flag struct {
 	set *Set
 
-	name        string
-	description string
-	decision    Decision
+	name            string
+	description     string
+	defaultDecision Decision
 }
 
 func (f *Flag) trace(ctx context.Context, d Decision) {
@@ -430,9 +425,9 @@ func (f *Flag) Description() string {
 	return f.description
 }
 
-// Default returns the default decision configured for this feature.
+// Default returns the default defaultDecision configured for this feature.
 func (f *Flag) Default() Decision {
-	return f.decision
+	return f.defaultDecision
 }
 
 // Strategy defines an interface used for deciding on whether a feature is enabled or not.

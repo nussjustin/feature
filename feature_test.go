@@ -33,9 +33,8 @@ func ExampleIf() {
 }
 
 func TestDecision_Enabled(t *testing.T) {
-	assertDecision(t, feature.FixedStrategy(feature.NoDecision), "", feature.NoDecision)
-	assertDecision(t, feature.FixedStrategy(feature.Disabled), "", feature.Disabled)
-	assertDecision(t, feature.FixedStrategy(feature.Enabled), "", feature.Enabled)
+	assertDecision(t, feature.FixedStrategy(feature.Disabled), "test", feature.Disabled)
+	assertDecision(t, feature.FixedStrategy(feature.Enabled), "test", feature.Enabled)
 }
 
 func ExampleSetStrategy() {
@@ -701,22 +700,22 @@ func TestFlag_Enabled(t *testing.T) {
 		assertDisabled(t, set.New(named("unknown")))
 	})
 
-	t.Run("DefaultConfig", func(t *testing.T) {
+	t.Run("DefaultEnabled", func(t *testing.T) {
 		var set feature.Set
-		cfg := named("no decision")
-		cfg.Default = feature.Enabled
+		cfg := named("DefaultEnabled true")
+		cfg.DefaultEnabled = true
 		assertEnabled(t, set.New(cfg))
 	})
 
-	t.Run("NoDefault", func(t *testing.T) {
+	t.Run("NoDefaultEnabled", func(t *testing.T) {
 		var set feature.Set
-		assertDisabled(t, set.New(named("no decision")))
+		assertDisabled(t, set.New(named("DefaultEnabled false")))
 	})
 }
 
 func TestFixedStrategy(t *testing.T) {
-	assertDecision(t, feature.FixedStrategy(feature.Disabled), "", feature.Disabled)
-	assertDecision(t, feature.FixedStrategy(feature.Enabled), "", feature.Enabled)
+	assertDecision(t, feature.FixedStrategy(feature.Disabled), "test", feature.Disabled)
+	assertDecision(t, feature.FixedStrategy(feature.Enabled), "test", feature.Enabled)
 }
 
 func TestStrategyFunc_Enabled(t *testing.T) {
