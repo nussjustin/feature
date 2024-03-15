@@ -20,7 +20,7 @@ import (
 )
 
 func named(name string, desc ...string) feature.Config {
-	return feature.Config{Flag: name, Description: strings.Join(desc, "")}
+	return feature.Config{Name: name, Description: strings.Join(desc, "")}
 }
 
 func ExampleIf() {

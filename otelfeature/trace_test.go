@@ -15,7 +15,7 @@ import (
 )
 
 func newFlag(tb testing.TB) *feature.Flag {
-	return (&feature.Set{}).New(feature.Config{Flag: tb.Name()})
+	return (&feature.Set{}).New(feature.Config{Name: tb.Name()})
 }
 
 func TestTracer_Tracing(t *testing.T) {

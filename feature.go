@@ -10,8 +10,8 @@ import (
 
 // Config contains configuration for a feature flag including the flag name and a description.
 type Config struct {
-	// Flag defines the name for the flag used for this feature.
-	Flag string
+	// Name defines the name for the flag used for this feature.
+	Name string
 
 	// Description contains an optional, human-readable description of the feature.
 	Description string
@@ -168,7 +168,7 @@ func (s *Set) newFlag(c Config) *Flag {
 		c.Default = NoDecision
 	}
 
-	f := &Flag{set: s, name: c.Flag, description: c.Description, decision: c.Default}
+	f := &Flag{set: s, name: c.Name, description: c.Description, decision: c.Default}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -177,11 +177,11 @@ func (s *Set) newFlag(c Config) *Flag {
 		s.flags = map[string]*Flag{}
 	}
 
-	if _, ok := s.flags[c.Flag]; ok {
-		panic(fmt.Sprintf("name %q already in use", c.Flag))
+	if _, ok := s.flags[c.Name]; ok {
+		panic(fmt.Sprintf("name %q already in use", c.Name))
 	}
 
-	s.flags[c.Flag] = f
+	s.flags[c.Name] = f
 
 	return f
 }
