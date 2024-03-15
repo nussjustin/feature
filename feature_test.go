@@ -650,6 +650,12 @@ func TestNewFlag(t *testing.T) {
 		})
 	})
 
+	t.Run("FailsEmptyName", func(t *testing.T) {
+		assertPanic(t, func() {
+			feature.New(named(""))
+		})
+	})
+
 	t.Run("HasMetadata", func(t *testing.T) {
 		f := feature.New(named("TestNewFlag/HasMetadata", "some description"))
 

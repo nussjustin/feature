@@ -88,8 +88,12 @@ func New(c Config) *Flag {
 
 // New registers and returns a new [Flag] on s.
 //
-// If the given name is already is use by another flag, Register will panic.
+// If the given name is empty or already registered, New will panic.
 func (s *Set) New(c Config) *Flag {
+	if c.Name == "" {
+		panic("missing name for flag")
+	}
+
 	return s.newFlag(c)
 }
 
