@@ -20,6 +20,9 @@ type Config struct {
 	//
 	// An empty value is treated as [NoDecision].
 	Default Decision
+
+	// Labels can be used to add additional metadata to a feature.
+	Labels map[string]string
 }
 
 // Decision is an enum of the potential decisions a [Strategy] can make on whether a [Flag] should be enabled or not.
