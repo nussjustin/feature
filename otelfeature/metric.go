@@ -109,8 +109,8 @@ func createMetricExperimentCallback(
 }
 
 func createMetricRunCallback() func(context.Context, *feature.Flag) (context.Context, func(feature.Decision, any, error)) {
-	return func(ctx context.Context, flag *feature.Flag) (context.Context, func(feature.Decision, any, error)) {
+	return func(ctx context.Context, _ *feature.Flag) (context.Context, func(feature.Decision, any, error)) {
 		// We count cases so no need to check the run itself
-		return ctx, func(d feature.Decision, _ any, err error) {}
+		return ctx, func(feature.Decision, any, error) {}
 	}
 }

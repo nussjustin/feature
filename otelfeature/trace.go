@@ -57,7 +57,7 @@ func createTraceCaseCallback(t trace.Tracer) func(context.Context, *feature.Flag
 }
 
 func createTraceCasePanickedCallback() func(context.Context, *feature.Flag, feature.Decision, *feature.PanicError) {
-	return func(ctx context.Context, flag *feature.Flag, decision feature.Decision, err *feature.PanicError) {
+	return func(ctx context.Context, _ *feature.Flag, _ feature.Decision, err *feature.PanicError) {
 		span := trace.SpanFromContext(ctx)
 
 		if span.IsRecording() {
@@ -95,7 +95,7 @@ func createTraceRunCallback(t trace.Tracer) func(context.Context, *feature.Flag)
 		ctx, span := t.Start(ctx, flag.Name(),
 			trace.WithAttributes(AttributeFeatureName.String(flag.Name())))
 
-		return ctx, func(decision feature.Decision, result any, err error) {
+		return ctx, func(decision feature.Decision, _ any, err error) {
 			span.SetAttributes(AttributeFeatureEnabled.Bool(decision == feature.Enabled))
 
 			if err != nil {
