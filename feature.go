@@ -286,9 +286,6 @@ func Experiment[T any](ctx context.Context, flag *Flag,
 		ctx, done = t.Experiment(ctx, flag)
 	}
 
-	// Check status before while the experiment runs. This can save some time if the used Strategy is slow.
-	isEnabled := flag.Enabled(ctx)
-
 	var wg sync.WaitGroup
 	var (
 		experimentT   T
@@ -309,6 +306,9 @@ func Experiment[T any](ctx context.Context, flag *Flag,
 		defer wg.Done()
 		controlT, controlErr = run(ctx, flag, Disabled, control)
 	}()
+
+	// Check status while the experiment runs. This can save some time if the used Strategy is slow.
+	isEnabled := flag.Enabled(ctx)
 
 	wg.Wait()
 
