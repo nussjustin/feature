@@ -695,10 +695,10 @@ func TestFlag_Labels(t *testing.T) {
 
 	f := set.New(feature.Config{
 		Name:   t.Name(),
-		Labels: map[string]string{"a": "b"},
+		Labels: map[string]any{"a": "b"},
 	})
 
-	if !maps.Equal(map[string]string{"a": "b"}, f.Labels()) {
+	if !maps.Equal(map[string]any{"a": "b"}, f.Labels()) {
 		t.Error("flag labels do not match configured labels")
 	}
 
@@ -706,7 +706,7 @@ func TestFlag_Labels(t *testing.T) {
 	delete(m, "a")
 	m["c"] = "d"
 
-	if !maps.Equal(map[string]string{"a": "b"}, f.Labels()) {
+	if !maps.Equal(map[string]any{"a": "b"}, f.Labels()) {
 		t.Error("flag labels were modified")
 	}
 }

@@ -18,7 +18,7 @@ type Config struct {
 	Description string
 
 	// Labels can be used to add additional metadata to a feature.
-	Labels map[string]string
+	Labels map[string]any
 
 	// DefaultEnabled, if true, causes the feature to be enabled by default when no explicit defaultDecision can be made for
 	// (either because no [Strategy] was set or because the final defaultDecision was [NoDecision]).
@@ -396,7 +396,7 @@ type Flag struct {
 	name            string
 	description     string
 	defaultDecision Decision
-	labels          map[string]string
+	labels          map[string]any
 }
 
 func (f *Flag) trace(ctx context.Context, d Decision) {
@@ -438,7 +438,7 @@ func (f *Flag) Description() string {
 }
 
 // Labels returns the labels associated with this feature.
-func (f *Flag) Labels() map[string]string {
+func (f *Flag) Labels() map[string]any {
 	return maps.Clone(f.labels)
 }
 
