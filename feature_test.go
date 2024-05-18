@@ -118,27 +118,6 @@ func TestSetStrategy(t *testing.T) {
 	assertDisabled(t, lowerFlag)
 	assertDisabled(t, mixedFlag)
 	assertEnabled(t, upperFlag)
-
-	// Test multiple
-	feature.SetStrategy(feature.FixedStrategy(feature.NoDecision), upper, lower)
-
-	assertDisabled(t, lowerFlag)
-	assertDisabled(t, mixedFlag)
-	assertEnabled(t, upperFlag)
-
-	// Test that nil is ignored
-	feature.SetStrategy(nil, lower)
-
-	assertEnabled(t, lowerFlag)
-	assertDisabled(t, mixedFlag)
-	assertDisabled(t, upperFlag)
-
-	// A bunch of nils should work
-	feature.SetStrategy(nil, nil, nil)
-
-	assertDisabled(t, lowerFlag)
-	assertDisabled(t, mixedFlag)
-	assertDisabled(t, upperFlag)
 }
 
 func TestSetTracer(t *testing.T) {
@@ -441,7 +420,7 @@ func ExampleSwitch() {
 	fmt.Println(post)
 }
 
-func TestCase_Run(t *testing.T) {
+func TestCase_Switch(t *testing.T) {
 	type result struct {
 		N     int
 		Error error
@@ -456,12 +435,6 @@ func TestCase_Run(t *testing.T) {
 	}{
 		{
 			Name:     "Old by default",
-			Old:      result{N: 1},
-			Expected: result{N: 1},
-		},
-		{
-			Name:     "Old by default via strategy",
-			Decision: feature.NoDecision,
 			Old:      result{N: 1},
 			Expected: result{N: 1},
 		},
@@ -501,7 +474,7 @@ func TestCase_Run(t *testing.T) {
 
 			ctx := context.Background()
 
-			f := set.New("case")
+			f := set.New("switch")
 
 			n, err := feature.Switch(ctx, f,
 				func(ctx context.Context) (int, error) { return testCase.New.N, testCase.New.Error },
@@ -645,15 +618,9 @@ func TestFlag_Enabled(t *testing.T) {
 		})
 		assertDisabled(t, set.New("disabled"))
 		assertEnabled(t, set.New("enabled"))
-		assertDisabled(t, set.New("unknown"))
 	})
 
-	t.Run("DefaultEnabled", func(t *testing.T) {
-		var set feature.Set
-		assertEnabled(t, set.New("DefaultEnabled", feature.WithDefaultEnabled()))
-	})
-
-	t.Run("NoDefaultEnabled", func(t *testing.T) {
+	t.Run("DefaultDisabled", func(t *testing.T) {
 		var set feature.Set
 		assertDisabled(t, set.New("Default"))
 	})
@@ -699,8 +666,11 @@ func TestDecisionMap_Enabled(t *testing.T) {
 	}
 
 	assertDecision(t, s, "Brad", feature.Disabled)
-	assertDecision(t, s, "Ian", feature.NoDecision)
 	assertDecision(t, s, "Rob", feature.Enabled)
+
+	assertPanic(t, func() {
+		assertDecision(t, s, "Disabled", feature.Disabled)
+	})
 }
 
 func assertEnabled(tb testing.TB, f *feature.Flag) {

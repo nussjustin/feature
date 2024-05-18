@@ -29,16 +29,7 @@ if newUIFlag.Enabled(ctx) {
 }
 ```
 
-It is also possible to define a default state (called
-[Decision](https://pkg.go.dev/github.com/nussjustin/feature#Decision) in this package) by setting the
-[Config.Default](https://pkg.go.dev/github.com/nussjustin/feature#Config.Default) field to the desired status.
-
-```go
-var newUIFlag = feature.New("new-ui", feature.WithDescription("enables the new UI"), feature.WithDefaultEnabled())
-```
-
-By default, a feature will be considered disabled unless the default is changed or a `Strategy` is used to make a
-dynamic decision at runtime.
+By default, a feature will be considered disabled unless a `Strategy` is used to make a dynamic decision at runtime.
 
 ### Using `Switch` to switch between code paths
 

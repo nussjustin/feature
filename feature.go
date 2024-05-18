@@ -16,11 +16,6 @@ import (
 type Decision string
 
 const (
-	// NoDecision indicates that a Strategy could not make a final Decision for a Flag.
-	//
-	// If this is the final value returned by a Strategy, or no Strategy was found for a Set, Flag.Enabled will behave
-	// as if the Decision was Disabled.
-	NoDecision Decision = "no_decision"
 	// Disabled disables a feature flag and the new code path of the corresponding branch.
 	Disabled Decision = "disabled"
 	// Enabled enables a feature flag and the new code path of the corresponding branch.
@@ -36,24 +31,26 @@ func If(cond bool) Decision {
 }
 
 // DecisionMap implements a simple [Strategy] that returns a fixed value for each flag by its name.
+//
+// Checking a flag that is not in the map will panic.
 type DecisionMap map[string]Decision
 
 var _ Strategy = (DecisionMap)(nil)
 
 // Enabled implements the [Strategy] interface.
 //
-// If a feature with the given name is not found, [NoDecision] is returned.
+// If a feature with the given name is not found, Enabled will panic.
 func (m DecisionMap) Enabled(_ context.Context, flag *Flag) Decision {
 	if d, ok := m[flag.Name()]; ok {
 		return d
 	}
-	return NoDecision
+	panic(fmt.Sprintf("strategy for feature %q not configured", flag.Name()))
 }
 
 // Set manages feature flags and can provide a [Strategy] (using [SetStrategy]) for making dynamic decisions about
 // a flags' status.
 //
-// The zero value is usable as is, returning the default for all flags.
+// The zero value is usable as is, using a strategy where all features are disabled.
 type Set struct {
 	strategy atomic.Pointer[Strategy]
 	tracer   atomic.Pointer[Tracer]
@@ -82,30 +79,18 @@ func (s *Set) New(name string, opts ...FlagOpt) *Flag {
 	return s.newFlag(name, opts)
 }
 
-// SetStrategy sets or removes the [Strategy] for the global [Set].
-//
-// If more than one non-nil [Strategy] is given they will be checked in the order given, using the first result that
-// is not [NoDecision] as the final result.
-//
-// See [Set.SetStrategy] for more information.
-func SetStrategy(strategy Strategy, others ...Strategy) {
-	globalSet.SetStrategy(strategy, others...)
+// SetStrategy sets the [Strategy] for the global [Set].
+func SetStrategy(strategy Strategy) {
+	globalSet.SetStrategy(strategy)
 }
 
-// SetStrategy sets or removes the [Strategy] used by s to make decisions.
-//
-// If more than one non-nil [Strategy] is given they will be checked in the order given, using the first result that
-// is not [NoDecision] as the final result.
-func (s *Set) SetStrategy(strategy Strategy, others ...Strategy) {
-	if len(others) > 0 {
-		strategy = chainStrategies(append([]Strategy{strategy}, others...))
+// SetStrategy sets the [Strategy] used by s to make decisions.
+func (s *Set) SetStrategy(strategy Strategy) {
+	if s == nil {
+		panic("strategy must not be nil")
 	}
 
-	if strategy == nil {
-		s.strategy.Store(nil)
-	} else {
-		s.strategy.Store(&strategy)
-	}
+	s.strategy.Store(&strategy)
 }
 
 // SetTracer sets the [Tracer] used for the global [Set].
@@ -329,13 +314,6 @@ func run[T any](ctx context.Context, flag *Flag, d Decision, f func(context.Cont
 
 type FlagOpt func(*Flag)
 
-// WithDefaultEnabled causes a flag to be enabled by default.
-func WithDefaultEnabled() FlagOpt {
-	return func(f *Flag) {
-		f.defaultEnabled = true
-	}
-}
-
 // WithDescription sets the description for a new flag.
 func WithDescription(desc string) FlagOpt {
 	return func(f *Flag) {
@@ -363,10 +341,9 @@ func WithLabels(l map[string]any) FlagOpt {
 type Flag struct {
 	set *Set
 
-	name           string
-	description    string
-	defaultEnabled bool
-	labels         map[string]any
+	name        string
+	description string
+	labels      map[string]any
 }
 
 func (f *Flag) trace(ctx context.Context, d Decision) {
@@ -377,21 +354,15 @@ func (f *Flag) trace(ctx context.Context, d Decision) {
 
 // Enabled returns true if the feature is enabled for the given context.
 //
-// A feature is considered enabled when the final [Decision], made by considering the [Strategy] set on the [Set] and
-// the default [Decision] configured for the [Flag], is [Enabled].
-//
 // Example:
 //
 //	if trackingFlag.Enabled(ctx) {
 //	   trackUser(ctx, user)
 //	}
 func (f *Flag) Enabled(ctx context.Context) bool {
-	d := NoDecision
+	d := Disabled
 	if s := f.set.strategy.Load(); s != nil {
 		d = (*s).Enabled(ctx, f)
-	}
-	if d == NoDecision {
-		d = f.Default()
 	}
 	f.trace(ctx, d)
 	return d == Enabled
@@ -412,44 +383,12 @@ func (f *Flag) Labels() map[string]any {
 	return maps.Clone(f.labels)
 }
 
-// Default returns the default [Decision] configured for this feature.
-func (f *Flag) Default() Decision {
-	return If(f.defaultEnabled)
-}
-
 // Strategy defines an interface used for deciding on whether a feature is enabled or not.
 //
 // A Strategy must be safe for concurrent use.
 type Strategy interface {
 	// Enabled takes the name of a feature flag and returns a Decision that determines if the flag should be enabled.
 	Enabled(ctx context.Context, flag *Flag) Decision
-}
-
-type chainStrategy []Strategy
-
-func (c chainStrategy) Enabled(ctx context.Context, flag *Flag) Decision {
-	for _, s := range c {
-		if d := s.Enabled(ctx, flag); d != NoDecision {
-			return d
-		}
-	}
-	return NoDecision
-}
-
-func chainStrategies(strategies []Strategy) Strategy {
-	chain := make([]Strategy, 0, len(strategies))
-
-	for _, strategy := range strategies {
-		if strategy != nil {
-			chain = append(chain, strategy)
-		}
-	}
-
-	if len(chain) == 0 {
-		return nil
-	}
-
-	return chainStrategy(chain)
 }
 
 type fixedStrategy struct {
