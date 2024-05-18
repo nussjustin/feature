@@ -121,6 +121,7 @@ func TestFlag_Enabled_Tracing(t *testing.T) {
 	var set feature.Set
 
 	flag := set.New("tracing")
+	set.SetStrategy(feature.FixedStrategy(false))
 
 	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, false)})
 	assertDisabled(t, flag)

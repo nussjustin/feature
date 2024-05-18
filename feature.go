@@ -26,10 +26,10 @@ func (m DecisionMap) Enabled(_ context.Context, flag *Flag) bool {
 	panic(fmt.Sprintf("strategy for feature %q not configured", flag.Name()))
 }
 
-// Set manages feature flags and can provide a [Strategy] (using [SetStrategy]) for making dynamic decisions about
+// Set manages feature flags and provides a [Strategy] (using [SetStrategy]) for making dynamic decisions about
 // a flags' status.
 //
-// The zero value is usable as is, using a strategy where all features are disabled.
+// A Set with no associated [Strategy] is invalid and checking a flag will panic.
 type Set struct {
 	strategy atomic.Pointer[Strategy]
 	tracer   atomic.Pointer[Tracer]
@@ -315,8 +315,6 @@ func WithLabels(l map[string]any) FlagOpt {
 // the behaviour of an application, for example by dynamically changing code paths (see [Experiment] and [Switch]).
 //
 // A Flag must be obtained using either [New] or [Set.New].
-//
-// The zero value is not valid.
 type Flag struct {
 	set *Set
 
@@ -339,10 +337,11 @@ func (f *Flag) trace(ctx context.Context, enabled bool) {
 //	   trackUser(ctx, user)
 //	}
 func (f *Flag) Enabled(ctx context.Context) bool {
-	var enabled bool
-	if s := f.set.strategy.Load(); s != nil {
-		enabled = (*s).Enabled(ctx, f)
+	s := f.set.strategy.Load()
+	if s == nil {
+		panic("no Strategy configured for set")
 	}
+	enabled := (*s).Enabled(ctx, f)
 	f.trace(ctx, enabled)
 	return enabled
 }

@@ -100,12 +100,7 @@ func TestSetStrategy(t *testing.T) {
 	mixedFlag := feature.New("TestSetStrategy/Mixed")
 	upperFlag := feature.New("TestSetStrategy/UPPER")
 
-	// Test initial setting
-	assertDisabled(t, lowerFlag)
-	assertDisabled(t, mixedFlag)
-	assertDisabled(t, upperFlag)
-
-	// Set setting first strategy
+	// Set first strategy
 	feature.SetStrategy(lower)
 
 	assertEnabled(t, lowerFlag)
@@ -297,6 +292,7 @@ func TestCase_Experiment(t *testing.T) {
 
 	t.Run("FunctionsAreCalledConcurrently", func(t *testing.T) {
 		var set feature.Set
+		set.SetStrategy(feature.FixedStrategy(false))
 
 		f := set.New("case")
 
@@ -345,6 +341,7 @@ func TestCase_Experiment(t *testing.T) {
 
 	t.Run("OldError", func(t *testing.T) {
 		var set feature.Set
+		set.SetStrategy(feature.FixedStrategy(false))
 
 		f := set.New("case")
 
@@ -375,6 +372,7 @@ func TestCase_Experiment(t *testing.T) {
 
 	t.Run("NewError", func(t *testing.T) {
 		var set feature.Set
+		set.SetStrategy(feature.FixedStrategy(false))
 
 		f := set.New("case")
 
@@ -607,7 +605,10 @@ func TestFlag_Labels(t *testing.T) {
 func TestFlag_Enabled(t *testing.T) {
 	t.Run("NoStrategy", func(t *testing.T) {
 		var set feature.Set
-		assertDisabled(t, set.New("disabled"))
+
+		assertPanic(t, func() {
+			assertDisabled(t, set.New("disabled"))
+		})
 	})
 
 	t.Run("StrategyOnSet", func(t *testing.T) {
@@ -618,11 +619,6 @@ func TestFlag_Enabled(t *testing.T) {
 		})
 		assertDisabled(t, set.New("disabled"))
 		assertEnabled(t, set.New("enabled"))
-	})
-
-	t.Run("DefaultDisabled", func(t *testing.T) {
-		var set feature.Set
-		assertDisabled(t, set.New("Default"))
 	})
 }
 

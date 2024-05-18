@@ -29,7 +29,36 @@ if newUIFlag.Enabled(ctx) {
 }
 ```
 
-By default, a feature will be considered disabled unless a `Strategy` is used to make a dynamic decision at runtime.
+In order for this to work a `Strategy` must be configured first. Otherwise `Enabled` will panic.
+
+### Configuring a strategy
+
+In order to use feature flags a [Strategy](https://pkg.go.dev/github.com/nussjustin/feature#Strategy) must be created 
+and associated with the `Set` using `Set.SetStrategy` or, if using the global set, the global `SetStrategy` function.
+
+Example:
+
+```go
+func main() {
+    feature.SetStrategy(myCustomStrategy)
+}
+```
+
+Or when using a custom `Set`:
+
+```go
+func main() {
+    mySet.SetStrategy(myCustomStrategy)
+}
+```
+
+The `Strategy` interface is defined as follows:
+
+```go
+type Strategy interface {
+    Enabled(ctx context.Context, flag *Flag) bool
+}
+```
 
 ### Using `Switch` to switch between code paths
 
@@ -94,38 +123,6 @@ Example:
 var mySet feature.Set // zero value is valid
 
 var optimizationFlag = mySet.New("new-ui", feature.WithDescription("enables the new UI"))
-```
-
-### Using dynamic strategies for controlling flags
-
-By default, all flags are considered disabled.
-
-In order to enable flags, either statically or dynamically, a
-[Strategy](https://pkg.go.dev/github.com/nussjustin/feature#Strategy) must be created an associated with the `Set` using
-`Set.SetStrategy` or, if using the global set, the global `SetStrategy` function.
-
-Example:
-
-```go
-func main() {
-    feature.SetStrategy(myCustomStrategy)
-}
-```
-
-Or when using a custom `Set`:
-
-```go
-func main() {
-    mySet.SetStrategy(myCustomStrategy)
-}
-```
-
-The `Strategy` interface is defined as follows:
-
-```go
-type Strategy interface {
-    Enabled(ctx context.Context, flag *Flag) bool
-}
 ```
 
 ### Changing strategies at runtime
