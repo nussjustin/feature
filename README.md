@@ -52,14 +52,6 @@ func main() {
 }
 ```
 
-The `Strategy` interface is defined as follows:
-
-```go
-type Strategy interface {
-    Enabled(ctx context.Context, flag *Flag) bool
-}
-```
-
 ### Using `Switch` to switch between code paths
 
 A common use case for flags is switching between code paths, for example using a `if`/`else` combination.

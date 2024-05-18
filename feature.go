@@ -19,11 +19,11 @@ var _ Strategy = (DecisionMap)(nil)
 // Enabled implements the [Strategy] interface.
 //
 // If a feature with the given name is not found, Enabled will panic.
-func (m DecisionMap) Enabled(_ context.Context, flag *Flag) bool {
-	if d, ok := m[flag.Name()]; ok {
+func (m DecisionMap) Enabled(_ context.Context, name string) bool {
+	if d, ok := m[name]; ok {
 		return d
 	}
-	panic(fmt.Sprintf("strategy for feature %q not configured", flag.Name()))
+	panic(fmt.Sprintf("strategy for feature %q not configured", name))
 }
 
 // Set manages feature flags and provides a [Strategy] (using [SetStrategy]) for making dynamic decisions about
@@ -341,7 +341,7 @@ func (f *Flag) Enabled(ctx context.Context) bool {
 	if s == nil {
 		panic("no Strategy configured for set")
 	}
-	enabled := (*s).Enabled(ctx, f)
+	enabled := (*s).Enabled(ctx, f.name)
 	f.trace(ctx, enabled)
 	return enabled
 }
@@ -366,7 +366,7 @@ func (f *Flag) Labels() map[string]any {
 // A Strategy must be safe for concurrent use.
 type Strategy interface {
 	// Enabled takes the name of a feature flag and returns true if the feature is enabled or false otherwise.
-	Enabled(ctx context.Context, flag *Flag) bool
+	Enabled(ctx context.Context, name string) bool
 }
 
 type fixedStrategy struct {
@@ -376,7 +376,7 @@ type fixedStrategy struct {
 var _ Strategy = fixedStrategy{}
 
 // Enabled implements the Strategy interface.
-func (f fixedStrategy) Enabled(context.Context, *Flag) bool {
+func (f fixedStrategy) Enabled(context.Context, string) bool {
 	return f.d
 }
 
@@ -386,11 +386,11 @@ func FixedStrategy(enabled bool) Strategy {
 }
 
 // StrategyFunc implements a [Strategy] by calling itself.
-type StrategyFunc func(ctx context.Context, flag *Flag) bool
+type StrategyFunc func(ctx context.Context, name string) bool
 
 var _ Strategy = (StrategyFunc)(nil)
 
 // Enabled implements the [Strategy] interface.
-func (f StrategyFunc) Enabled(ctx context.Context, flag *Flag) bool {
-	return f(ctx, flag)
+func (f StrategyFunc) Enabled(ctx context.Context, name string) bool {
+	return f(ctx, name)
 }

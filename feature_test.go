@@ -21,7 +21,7 @@ import (
 )
 
 func ExampleIf() {
-	testerStrategy = feature.StrategyFunc(func(ctx context.Context, _ *feature.Flag) bool {
+	testerStrategy = feature.StrategyFunc(func(ctx context.Context, _ string) bool {
 		// Enable all flags for testers
 		return IsTester(ctx)
 	})
@@ -88,12 +88,12 @@ func TestSetStrategy(t *testing.T) {
 		return strings.TrimPrefix(s, "TestSetStrategy/")
 	}
 
-	lower := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) bool {
-		return strings.ToLower(trim(f.Name())) == trim(f.Name())
+	lower := feature.StrategyFunc(func(_ context.Context, name string) bool {
+		return strings.ToLower(trim(name)) == trim(name)
 	})
 
-	upper := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) bool {
-		return strings.ToUpper(trim(f.Name())) == trim(f.Name())
+	upper := feature.StrategyFunc(func(_ context.Context, name string) bool {
+		return strings.ToUpper(trim(name)) == trim(name)
 	})
 
 	lowerFlag := feature.New("TestSetStrategy/lower")
@@ -628,8 +628,8 @@ func TestFixedStrategy(t *testing.T) {
 }
 
 func TestStrategyFunc_Enabled(t *testing.T) {
-	s := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) bool {
-		return f.Name() == "Rob"
+	s := feature.StrategyFunc(func(_ context.Context, name string) bool {
+		return name == "Rob"
 	})
 
 	assertDecision(t, s, "Brad", false)
@@ -688,11 +688,7 @@ func assertDisabled(tb testing.TB, f *feature.Flag) {
 func assertDecision(tb testing.TB, s feature.Strategy, name string, want bool) {
 	tb.Helper()
 
-	var set feature.Set
-
-	f := set.New(name)
-
-	if got := s.Enabled(context.Background(), f); got != want {
+	if got := s.Enabled(context.Background(), name); got != want {
 		tb.Errorf("got %t, want %T", got, want)
 	}
 }
