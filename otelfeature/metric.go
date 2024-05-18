@@ -47,10 +47,10 @@ func newMetricTracer(opts *Opts) (feature.Tracer, error) {
 
 func createMetricDecisionCallback(
 	decisionCounter metric.Int64Counter,
-) func(context.Context, *feature.Flag, feature.Decision) {
-	return func(ctx context.Context, flag *feature.Flag, decision feature.Decision) {
+) func(context.Context, *feature.Flag, bool) {
+	return func(ctx context.Context, flag *feature.Flag, enabled bool) {
 		decisionCounter.Add(ctx, 1, metric.WithAttributes(
-			AttributeFeatureEnabled.Bool(decision == feature.Enabled),
+			AttributeFeatureEnabled.Bool(enabled),
 			AttributeFeatureName.String(flag.Name())))
 	}
 }
@@ -58,11 +58,11 @@ func createMetricDecisionCallback(
 func createMetricExperimentBranchCallback(
 	caseCounter metric.Int64Counter,
 	caseFailedCounter metric.Int64Counter,
-) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
-	return func(ctx context.Context, flag *feature.Flag, decision feature.Decision) (context.Context, func(any, error)) {
+) func(context.Context, *feature.Flag, bool) (context.Context, func(any, error)) {
+	return func(ctx context.Context, flag *feature.Flag, enabled bool) (context.Context, func(any, error)) {
 		return ctx, func(_ any, err error) {
 			attributes := metric.WithAttributes(
-				AttributeFeatureEnabled.Bool(decision == feature.Enabled),
+				AttributeFeatureEnabled.Bool(enabled),
 				AttributeFeatureName.String(flag.Name()))
 
 			caseCounter.Add(ctx, 1, attributes)
@@ -77,25 +77,25 @@ func createMetricExperimentBranchCallback(
 func createMetricExperimentCallback(
 	experimentCounter metric.Int64Counter,
 	experimentErrorsCounter metric.Int64Counter,
-) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error, bool)) {
-	return func(ctx context.Context, flag *feature.Flag, d feature.Decision) (context.Context, func(any, error, bool)) {
+) func(context.Context, *feature.Flag, bool) (context.Context, func(any, error, bool)) {
+	return func(ctx context.Context, flag *feature.Flag, enabled bool) (context.Context, func(any, error, bool)) {
 		return ctx, func(_ any, err error, success bool) {
 			experimentCounter.Add(ctx, 1, metric.WithAttributes(
 				AttributeExperimentSuccess.Bool(success),
-				AttributeFeatureEnabled.Bool(d == feature.Enabled),
+				AttributeFeatureEnabled.Bool(enabled),
 				AttributeFeatureName.String(flag.Name())))
 
 			if err != nil {
 				experimentErrorsCounter.Add(ctx, 1, metric.WithAttributes(
-					AttributeFeatureEnabled.Bool(d == feature.Enabled),
+					AttributeFeatureEnabled.Bool(enabled),
 					AttributeFeatureName.String(flag.Name())))
 			}
 		}
 	}
 }
 
-func createMetricSwitchCallback() func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(result any, err error)) {
-	return func(ctx context.Context, _ *feature.Flag, _ feature.Decision) (context.Context, func(result any, err error)) {
+func createMetricSwitchCallback() func(context.Context, *feature.Flag, bool) (context.Context, func(result any, err error)) {
+	return func(ctx context.Context, _ *feature.Flag, _ bool) (context.Context, func(result any, err error)) {
 		return ctx, func(any, error) {}
 	}
 }

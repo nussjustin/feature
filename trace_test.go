@@ -14,7 +14,7 @@ func TestCase_Experiment_Tracing(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			var set feature.Set
 
-			set.SetStrategy(feature.FixedStrategy(feature.Enabled))
+			set.SetStrategy(feature.FixedStrategy(true))
 			set.SetTracer(tracerCallback(t))
 
 			f := set.New("some flag")
@@ -44,8 +44,8 @@ func TestCase_Experiment_Tracing(t *testing.T) {
 	) func(testing.TB) feature.Tracer {
 		return func(tb testing.TB) feature.Tracer {
 			return feature.Tracer{
-				Decision:         assertTracedDecision(tb, feature.Enabled),
-				Experiment:       assertTracedExperiment(tb, feature.Enabled, wantEnabled, wantEnabledErr, wantSuccess),
+				Decision:         assertTracedDecision(tb, true),
+				Experiment:       assertTracedExperiment(tb, true, wantEnabled, wantEnabledErr, wantSuccess),
 				ExperimentBranch: assertTracedExperimentBranch(tb, wantEnabled, wantEnabledErr, wantDisabled, wantDisabledErr),
 				Switch:           assertNoTracedSwitch(tb),
 			}
@@ -85,11 +85,11 @@ func TestCase_Run_Tracing(t *testing.T) {
 
 		f := set.New("some flag")
 
-		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
+		set.SetStrategy(feature.FixedStrategy(true))
 		set.SetTracer(feature.Tracer{
-			Decision:   assertTracedDecision(t, feature.Enabled),
+			Decision:   assertTracedDecision(t, true),
 			Experiment: assertNoTracedExperiment(t),
-			Switch:     assertTracedSwitch(t, feature.Enabled, 2, nil),
+			Switch:     assertTracedSwitch(t, true, 2, nil),
 		})
 
 		_, _ = feature.Switch(context.Background(), f,
@@ -104,11 +104,11 @@ func TestCase_Run_Tracing(t *testing.T) {
 
 		err1, err2 := errors.New("error 1"), errors.New("error 2")
 
-		set.SetStrategy(feature.FixedStrategy(feature.Disabled))
+		set.SetStrategy(feature.FixedStrategy(false))
 		set.SetTracer(feature.Tracer{
-			Decision:   assertTracedDecision(t, feature.Disabled),
+			Decision:   assertTracedDecision(t, false),
 			Experiment: assertNoTracedExperiment(t),
-			Switch:     assertTracedSwitch(t, feature.Disabled, 1, err1),
+			Switch:     assertTracedSwitch(t, false, 1, err1),
 		})
 
 		_, _ = feature.Switch(context.Background(), f,
@@ -122,14 +122,12 @@ func TestFlag_Enabled_Tracing(t *testing.T) {
 
 	flag := set.New("tracing")
 
-	// NoDecision defaultEnabled
-	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, feature.Disabled)})
+	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, false)})
 	assertDisabled(t, flag)
 
-	set.SetStrategy(feature.FixedStrategy(feature.Enabled))
+	set.SetStrategy(feature.FixedStrategy(true))
 
-	// Set strategy defaultEnabled
-	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, feature.Enabled)})
+	set.SetTracer(feature.Tracer{Decision: assertTracedDecision(t, true)})
 	assertEnabled(t, flag)
 }
 
@@ -157,32 +155,32 @@ func assertCalled(tb testing.TB, name string) func() {
 
 func assertTracedDecision(
 	tb testing.TB,
-	want feature.Decision,
-) func(context.Context, *feature.Flag, feature.Decision) {
+	want bool,
+) func(context.Context, *feature.Flag, bool) {
 	called := assertCalled(tb, "Decision")
 
-	return func(ctx context.Context, flag *feature.Flag, got feature.Decision) {
+	return func(ctx context.Context, flag *feature.Flag, got bool) {
 		tb.Helper()
 
 		called()
 
 		if got != want {
-			tb.Errorf("got %s, want %s", got, want)
+			tb.Errorf("got %t, want %t", got, want)
 		}
 	}
 }
 
 func assertTracedCase(
 	tb testing.TB,
-	wantDecision feature.Decision,
+	wantDecision bool,
 	want any,
 	wantErr error,
-) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
+) func(context.Context, *feature.Flag, bool) (context.Context, func(any, error)) {
 	called := assertCalled(tb, "Case")
 
-	return func(ctx context.Context, _ *feature.Flag, gotDecision feature.Decision) (context.Context, func(any, error)) {
+	return func(ctx context.Context, _ *feature.Flag, gotDecision bool) (context.Context, func(any, error)) {
 		if gotDecision != wantDecision {
-			tb.Errorf("got decision %s, want %s", gotDecision, wantDecision)
+			tb.Errorf("got decision %t, want %t", gotDecision, wantDecision)
 		}
 
 		return ctx, func(gotResult any, gotErr error) {
@@ -205,20 +203,20 @@ func assertTracedExperimentBranch(
 
 	wantDisabled any,
 	wantDisabledErr error,
-) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
-	onDisabled := assertTracedCase(tb, feature.Disabled, wantDisabled, wantDisabledErr)
-	onEnabled := assertTracedCase(tb, feature.Enabled, wantEnabled, wantEnabledErr)
+) func(context.Context, *feature.Flag, bool) (context.Context, func(any, error)) {
+	onDisabled := assertTracedCase(tb, false, wantDisabled, wantDisabledErr)
+	onEnabled := assertTracedCase(tb, true, wantEnabled, wantEnabledErr)
 
-	return func(ctx context.Context, f *feature.Flag, decision feature.Decision) (context.Context, func(any, error)) {
-		if decision == feature.Enabled {
+	return func(ctx context.Context, f *feature.Flag, decision bool) (context.Context, func(any, error)) {
+		if decision == true {
 			return onEnabled(ctx, f, decision)
 		}
 		return onDisabled(ctx, f, decision)
 	}
 }
 
-func assertNoTracedExperiment(tb testing.TB) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error, bool)) {
-	return func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error, bool)) {
+func assertNoTracedExperiment(tb testing.TB) func(context.Context, *feature.Flag, bool) (context.Context, func(any, error, bool)) {
+	return func(context.Context, *feature.Flag, bool) (context.Context, func(any, error, bool)) {
 		tb.Fatal("Experiment called")
 		return nil, nil
 	}
@@ -226,19 +224,19 @@ func assertNoTracedExperiment(tb testing.TB) func(context.Context, *feature.Flag
 
 func assertTracedExperiment(
 	tb testing.TB,
-	wantDecision feature.Decision,
+	wantDecision bool,
 	want any,
 	wantErr error,
 	wantSuccess bool,
-) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error, bool)) {
+) func(context.Context, *feature.Flag, bool) (context.Context, func(any, error, bool)) {
 	called := assertCalled(tb, "Experiment")
 
-	return func(_ context.Context, _ *feature.Flag, gotDecision feature.Decision) (context.Context, func(any, error, bool)) {
+	return func(_ context.Context, _ *feature.Flag, gotDecision bool) (context.Context, func(any, error, bool)) {
 		return nil, func(got any, gotErr error, gotSuccess bool) {
 			called()
 
 			if gotDecision != wantDecision {
-				tb.Errorf("got decision %s, want %s", gotDecision, wantDecision)
+				tb.Errorf("got decision %t, want %t", gotDecision, wantDecision)
 			}
 
 			if !reflect.DeepEqual(got, want) {
@@ -254,8 +252,8 @@ func assertTracedExperiment(
 	}
 }
 
-func assertNoTracedSwitch(tb testing.TB) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
-	return func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
+func assertNoTracedSwitch(tb testing.TB) func(context.Context, *feature.Flag, bool) (context.Context, func(any, error)) {
+	return func(context.Context, *feature.Flag, bool) (context.Context, func(any, error)) {
 		tb.Fatal("Switch called")
 		return nil, nil
 	}
@@ -263,18 +261,18 @@ func assertNoTracedSwitch(tb testing.TB) func(context.Context, *feature.Flag, fe
 
 func assertTracedSwitch(
 	tb testing.TB,
-	wantDecision feature.Decision,
+	wantDecision bool,
 	want any,
 	wantErr error,
-) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
+) func(context.Context, *feature.Flag, bool) (context.Context, func(any, error)) {
 	called := assertCalled(tb, "Switch")
 
-	return func(ctx context.Context, _ *feature.Flag, gotDecision feature.Decision) (context.Context, func(any, error)) {
+	return func(ctx context.Context, _ *feature.Flag, gotDecision bool) (context.Context, func(any, error)) {
 		return ctx, func(got any, gotErr error) {
 			called()
 
 			if gotDecision != wantDecision {
-				tb.Errorf("got decision %s, want %s", gotDecision, wantDecision)
+				tb.Errorf("got decision %t, want %t", gotDecision, wantDecision)
 			}
 
 			if !reflect.DeepEqual(got, want) {

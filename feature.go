@@ -9,38 +9,17 @@ import (
 	"sync/atomic"
 )
 
-// Decision is an enum of the potential decisions a [Strategy] can make on whether a [Flag] should be enabled or not.
-//
-// Through the global [FixedStrategy] function, a [Decision] can be used directly as [Strategy], which can be useful
-// for defining a global fallback.
-type Decision string
-
-const (
-	// Disabled disables a feature flag and the new code path of the corresponding branch.
-	Disabled Decision = "disabled"
-	// Enabled enables a feature flag and the new code path of the corresponding branch.
-	Enabled Decision = "enabled"
-)
-
-// If returns Enabled when the first argument is true, or Disabled otherwise.
-func If(cond bool) Decision {
-	if cond {
-		return Enabled
-	}
-	return Disabled
-}
-
 // DecisionMap implements a simple [Strategy] that returns a fixed value for each flag by its name.
 //
 // Checking a flag that is not in the map will panic.
-type DecisionMap map[string]Decision
+type DecisionMap map[string]bool
 
 var _ Strategy = (DecisionMap)(nil)
 
 // Enabled implements the [Strategy] interface.
 //
 // If a feature with the given name is not found, Enabled will panic.
-func (m DecisionMap) Enabled(_ context.Context, flag *Flag) Decision {
+func (m DecisionMap) Enabled(_ context.Context, flag *Flag) bool {
 	if d, ok := m[flag.Name()]; ok {
 		return d
 	}
@@ -175,7 +154,7 @@ func (s *Set) newFlag(name string, opts []FlagOpt) *Flag {
 // A basic, pre-configured [Tracer] using OpenTelemetry can be found in the otelfeature subpackage.
 type Tracer struct {
 	// Decision is called every time [Flag.Enabled] is called.
-	Decision func(context.Context, *Flag, Decision)
+	Decision func(ctx context.Context, f *Flag, enabled bool)
 
 	// Experiment is called at the beginning of every call to [Experiment].
 	//
@@ -184,21 +163,21 @@ type Tracer struct {
 	// results were equal and no errors occurred).
 	//
 	// The returned function can be nil.
-	Experiment func(context.Context, *Flag, Decision) (context.Context, func(result any, err error, success bool))
+	Experiment func(ctx context.Context, f *Flag, enabled bool) (context.Context, func(result any, err error, success bool))
 
 	// ExperimentBranch is called for each called function during [Experiment] as well as for the function called by [Switch].
 	//
 	// The returned function is called after the called function has returned with the values returned by the function.
 	//
 	// The returned function can be nil.
-	ExperimentBranch func(context.Context, *Flag, Decision) (context.Context, func(result any, err error))
+	ExperimentBranch func(ctx context.Context, f *Flag, enabled bool) (context.Context, func(result any, err error))
 
 	// Switch is called at the beginning of every call to [Switch].
 	//
 	// The returned function is called with the result that will be returned.
 	//
 	// The returned function can be nil.
-	Switch func(context.Context, *Flag, Decision) (context.Context, func(result any, err error))
+	Switch func(ctx context.Context, f *Flag, enabled bool) (context.Context, func(result any, err error))
 }
 
 // Equals returns a function that compares to values of the same type using ==.
@@ -222,11 +201,11 @@ func Experiment[T any](ctx context.Context, flag *Flag,
 	control func(context.Context) (T, error),
 	equals func(new, old T) bool,
 ) (T, error) {
-	isEnabled := flag.Enabled(ctx)
+	enabled := flag.Enabled(ctx)
 
 	var done func(result any, err error, success bool)
 	if t := flag.set.getTracer(); t.Experiment != nil {
-		ctx, done = t.Experiment(ctx, flag, If(isEnabled))
+		ctx, done = t.Experiment(ctx, flag, enabled)
 	}
 
 	var wg sync.WaitGroup
@@ -241,13 +220,13 @@ func Experiment[T any](ctx context.Context, flag *Flag,
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		experimentT, experimentErr = run(ctx, flag, Enabled, experimental)
+		experimentT, experimentErr = run(ctx, flag, true, experimental)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		controlT, controlErr = run(ctx, flag, Disabled, control)
+		controlT, controlErr = run(ctx, flag, false, control)
 	}()
 
 	wg.Wait()
@@ -255,7 +234,7 @@ func Experiment[T any](ctx context.Context, flag *Flag,
 	var result T
 	var err error
 
-	if isEnabled {
+	if enabled {
 		result, err = experimentT, experimentErr
 	} else {
 		result, err = controlT, controlErr
@@ -280,7 +259,7 @@ func Switch[T any](ctx context.Context, flag *Flag,
 
 	var done func(any, error)
 	if t := flag.set.getTracer(); t.Switch != nil {
-		ctx, done = t.Switch(ctx, flag, If(enabled))
+		ctx, done = t.Switch(ctx, flag, enabled)
 	}
 
 	fn := ifDisabled
@@ -297,12 +276,12 @@ func Switch[T any](ctx context.Context, flag *Flag,
 	return resultT, err
 }
 
-func run[T any](ctx context.Context, flag *Flag, d Decision, f func(context.Context) (T, error)) (result T, err error) {
+func run[T any](ctx context.Context, flag *Flag, enabled bool, f func(context.Context) (T, error)) (result T, err error) {
 	t := flag.set.getTracer()
 
 	if t.ExperimentBranch != nil {
 		var done func(any, error)
-		ctx, done = t.ExperimentBranch(ctx, flag, d)
+		ctx, done = t.ExperimentBranch(ctx, flag, enabled)
 
 		if done != nil {
 			defer func() { done(result, err) }()
@@ -346,9 +325,9 @@ type Flag struct {
 	labels      map[string]any
 }
 
-func (f *Flag) trace(ctx context.Context, d Decision) {
+func (f *Flag) trace(ctx context.Context, enabled bool) {
 	if t := f.set.getTracer(); t.Decision != nil {
-		t.Decision(ctx, f, d)
+		t.Decision(ctx, f, enabled)
 	}
 }
 
@@ -360,12 +339,12 @@ func (f *Flag) trace(ctx context.Context, d Decision) {
 //	   trackUser(ctx, user)
 //	}
 func (f *Flag) Enabled(ctx context.Context) bool {
-	d := Disabled
+	var enabled bool
 	if s := f.set.strategy.Load(); s != nil {
-		d = (*s).Enabled(ctx, f)
+		enabled = (*s).Enabled(ctx, f)
 	}
-	f.trace(ctx, d)
-	return d == Enabled
+	f.trace(ctx, enabled)
+	return enabled
 }
 
 // Name returns the name of the feature flag.
@@ -387,32 +366,32 @@ func (f *Flag) Labels() map[string]any {
 //
 // A Strategy must be safe for concurrent use.
 type Strategy interface {
-	// Enabled takes the name of a feature flag and returns a Decision that determines if the flag should be enabled.
-	Enabled(ctx context.Context, flag *Flag) Decision
+	// Enabled takes the name of a feature flag and returns true if the feature is enabled or false otherwise.
+	Enabled(ctx context.Context, flag *Flag) bool
 }
 
 type fixedStrategy struct {
-	d Decision
+	d bool
 }
 
 var _ Strategy = fixedStrategy{}
 
 // Enabled implements the Strategy interface.
-func (f fixedStrategy) Enabled(context.Context, *Flag) Decision {
+func (f fixedStrategy) Enabled(context.Context, *Flag) bool {
 	return f.d
 }
 
-// FixedStrategy returns a [Strategy] that always returns the given [Decision] d.
-func FixedStrategy(d Decision) Strategy {
-	return fixedStrategy{d}
+// FixedStrategy returns a [Strategy] that always returns the given boolean decision.
+func FixedStrategy(enabled bool) Strategy {
+	return fixedStrategy{enabled}
 }
 
 // StrategyFunc implements a [Strategy] by calling itself.
-type StrategyFunc func(ctx context.Context, flag *Flag) Decision
+type StrategyFunc func(ctx context.Context, flag *Flag) bool
 
 var _ Strategy = (StrategyFunc)(nil)
 
 // Enabled implements the [Strategy] interface.
-func (f StrategyFunc) Enabled(ctx context.Context, flag *Flag) Decision {
+func (f StrategyFunc) Enabled(ctx context.Context, flag *Flag) bool {
 	return f(ctx, flag)
 }

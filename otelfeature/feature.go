@@ -17,7 +17,7 @@ const (
 
 const (
 	// AttributeFeatureEnabled is true if a flag was enabled or if running the experimental case in an Experiment.
-	AttributeFeatureEnabled = attribute.Key("feature.enabled")
+	AttributeFeatureEnabled = attribute.Key("true")
 
 	// AttributeFeatureName contains the name of the used feature flag.
 	AttributeFeatureName = attribute.Key("feature.name")
@@ -61,29 +61,29 @@ func Tracer(opts *Opts) (feature.Tracer, error) {
 
 func combineTracers(metric, trace feature.Tracer) feature.Tracer {
 	return feature.Tracer{
-		Decision: func(ctx context.Context, flag *feature.Flag, decision feature.Decision) {
-			trace.Decision(ctx, flag, decision)
-			metric.Decision(ctx, flag, decision)
+		Decision: func(ctx context.Context, flag *feature.Flag, enabled bool) {
+			trace.Decision(ctx, flag, enabled)
+			metric.Decision(ctx, flag, enabled)
 		},
-		Experiment: func(ctx context.Context, flag *feature.Flag, d feature.Decision) (context.Context, func(result any, err error, success bool)) {
-			ctx, traceDone := trace.Experiment(ctx, flag, d)
-			ctx, metricDone := metric.Experiment(ctx, flag, d)
+		Experiment: func(ctx context.Context, flag *feature.Flag, enabled bool) (context.Context, func(result any, err error, success bool)) {
+			ctx, traceDone := trace.Experiment(ctx, flag, enabled)
+			ctx, metricDone := metric.Experiment(ctx, flag, enabled)
 			return ctx, func(result any, err error, success bool) {
 				metricDone(result, err, success)
 				traceDone(result, err, success)
 			}
 		},
-		ExperimentBranch: func(ctx context.Context, flag *feature.Flag, decision feature.Decision) (context.Context, func(result any, err error)) {
-			ctx, traceDone := trace.ExperimentBranch(ctx, flag, decision)
-			ctx, metricDone := metric.ExperimentBranch(ctx, flag, decision)
+		ExperimentBranch: func(ctx context.Context, flag *feature.Flag, enabled bool) (context.Context, func(result any, err error)) {
+			ctx, traceDone := trace.ExperimentBranch(ctx, flag, enabled)
+			ctx, metricDone := metric.ExperimentBranch(ctx, flag, enabled)
 			return ctx, func(result any, err error) {
 				metricDone(result, err)
 				traceDone(result, err)
 			}
 		},
-		Switch: func(ctx context.Context, flag *feature.Flag, d feature.Decision) (context.Context, func(result any, err error)) {
-			ctx, traceDone := trace.Switch(ctx, flag, d)
-			ctx, metricDone := metric.Switch(ctx, flag, d)
+		Switch: func(ctx context.Context, flag *feature.Flag, enabled bool) (context.Context, func(result any, err error)) {
+			ctx, traceDone := trace.Switch(ctx, flag, enabled)
+			ctx, metricDone := metric.Switch(ctx, flag, enabled)
 			return ctx, func(result any, err error) {
 				metricDone(result, err)
 				traceDone(result, err)

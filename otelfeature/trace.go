@@ -26,21 +26,21 @@ func newTraceTracer(opts *Opts) feature.Tracer {
 	}
 }
 
-func createTraceDecisionCallback() func(context.Context, *feature.Flag, feature.Decision) {
-	return func(ctx context.Context, flag *feature.Flag, decision feature.Decision) {
+func createTraceDecisionCallback() func(context.Context, *feature.Flag, bool) {
+	return func(ctx context.Context, flag *feature.Flag, enabled bool) {
 		span := trace.SpanFromContext(ctx)
 		span.AddEvent("decision", trace.WithAttributes(
-			AttributeFeatureEnabled.Bool(decision == feature.Enabled),
+			AttributeFeatureEnabled.Bool(enabled),
 			AttributeFeatureName.String(flag.Name())))
 	}
 }
 
-func createTraceExperimentCallback(t trace.Tracer) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(result any, err error, success bool)) {
-	return func(ctx context.Context, flag *feature.Flag, d feature.Decision) (context.Context, func(result any, err error, success bool)) {
+func createTraceExperimentCallback(t trace.Tracer) func(context.Context, *feature.Flag, bool) (context.Context, func(result any, err error, success bool)) {
+	return func(ctx context.Context, flag *feature.Flag, enabled bool) (context.Context, func(result any, err error, success bool)) {
 		ctx, span := t.Start(ctx, flag.Name(),
 			trace.WithAttributes(
+				AttributeFeatureEnabled.Bool(enabled),
 				AttributeFeatureName.String(flag.Name()),
-				AttributeFeatureEnabled.Bool(d == feature.Enabled),
 			),
 		)
 
@@ -58,11 +58,11 @@ func createTraceExperimentCallback(t trace.Tracer) func(context.Context, *featur
 	}
 }
 
-func createTraceExperimentBranchCallback(t trace.Tracer) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(result any, err error)) {
-	return func(ctx context.Context, flag *feature.Flag, decision feature.Decision) (context.Context, func(result any, err error)) {
-		ctx, span := t.Start(ctx, nameFromDecision(decision),
+func createTraceExperimentBranchCallback(t trace.Tracer) func(context.Context, *feature.Flag, bool) (context.Context, func(result any, err error)) {
+	return func(ctx context.Context, flag *feature.Flag, enabled bool) (context.Context, func(result any, err error)) {
+		ctx, span := t.Start(ctx, nameFromDecision(enabled),
 			trace.WithAttributes(
-				AttributeFeatureEnabled.Bool(decision == feature.Enabled),
+				AttributeFeatureEnabled.Bool(enabled),
 				AttributeFeatureName.String(flag.Name())))
 
 		return ctx, func(_ any, err error) {
@@ -77,12 +77,12 @@ func createTraceExperimentBranchCallback(t trace.Tracer) func(context.Context, *
 	}
 }
 
-func createTraceSwitchCallback(t trace.Tracer) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(result any, err error)) {
-	return func(ctx context.Context, flag *feature.Flag, d feature.Decision) (context.Context, func(result any, err error)) {
+func createTraceSwitchCallback(t trace.Tracer) func(context.Context, *feature.Flag, bool) (context.Context, func(result any, err error)) {
+	return func(ctx context.Context, flag *feature.Flag, enabled bool) (context.Context, func(result any, err error)) {
 		ctx, span := t.Start(ctx, flag.Name(),
 			trace.WithAttributes(
+				AttributeFeatureEnabled.Bool(enabled),
 				AttributeFeatureName.String(flag.Name()),
-				AttributeFeatureEnabled.Bool(d == feature.Enabled),
 			),
 		)
 
@@ -98,8 +98,8 @@ func createTraceSwitchCallback(t trace.Tracer) func(context.Context, *feature.Fl
 	}
 }
 
-func nameFromDecision(d feature.Decision) string {
-	if d == feature.Enabled {
+func nameFromDecision(enabled bool) string {
+	if enabled {
 		return "Enabled"
 	}
 	return "Disabled"

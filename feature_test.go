@@ -21,17 +21,17 @@ import (
 )
 
 func ExampleIf() {
-	testerStrategy = feature.StrategyFunc(func(ctx context.Context, _ *feature.Flag) feature.Decision {
+	testerStrategy = feature.StrategyFunc(func(ctx context.Context, _ *feature.Flag) bool {
 		// Enable all flags for testers
-		return feature.If(IsTester(ctx))
+		return IsTester(ctx)
 	})
 
 	feature.SetStrategy(testerStrategy)
 }
 
 func TestDecision_Enabled(t *testing.T) {
-	assertDecision(t, feature.FixedStrategy(feature.Disabled), "test", feature.Disabled)
-	assertDecision(t, feature.FixedStrategy(feature.Enabled), "test", feature.Enabled)
+	assertDecision(t, feature.FixedStrategy(false), "test", false)
+	assertDecision(t, feature.FixedStrategy(true), "test", true)
 }
 
 func ExampleSetStrategy() {
@@ -88,12 +88,12 @@ func TestSetStrategy(t *testing.T) {
 		return strings.TrimPrefix(s, "TestSetStrategy/")
 	}
 
-	lower := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) feature.Decision {
-		return feature.If(strings.ToLower(trim(f.Name())) == trim(f.Name()))
+	lower := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) bool {
+		return strings.ToLower(trim(f.Name())) == trim(f.Name())
 	})
 
-	upper := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) feature.Decision {
-		return feature.If(strings.ToUpper(trim(f.Name())) == trim(f.Name()))
+	upper := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) bool {
+		return strings.ToUpper(trim(f.Name())) == trim(f.Name())
 	})
 
 	lowerFlag := feature.New("TestSetStrategy/lower")
@@ -124,14 +124,14 @@ func TestSetTracer(t *testing.T) {
 	var caseCount, decisionCount, runCount int
 
 	feature.SetTracer(feature.Tracer{
-		Decision: func(context.Context, *feature.Flag, feature.Decision) {
+		Decision: func(context.Context, *feature.Flag, bool) {
 			decisionCount++
 		},
-		ExperimentBranch: func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
+		ExperimentBranch: func(context.Context, *feature.Flag, bool) (context.Context, func(any, error)) {
 			caseCount++
 			return context.Background(), func(any, error) {}
 		},
-		Switch: func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
+		Switch: func(context.Context, *feature.Flag, bool) (context.Context, func(any, error)) {
 			runCount++
 			return context.Background(), func(any, error) {}
 		},
@@ -174,7 +174,7 @@ func ExampleExperiment() {
 }
 
 func TestCase_Experiment(t *testing.T) {
-	newMatchTest := func(want int, equals bool, d feature.Decision) func(*testing.T) {
+	newMatchTest := func(want int, equals bool, d bool) func(*testing.T) {
 		return func(t *testing.T) {
 			var set feature.Set
 			set.SetStrategy(feature.FixedStrategy(d))
@@ -196,19 +196,19 @@ func TestCase_Experiment(t *testing.T) {
 	}
 
 	t.Run("Match", func(t *testing.T) {
-		t.Run("ReturnsOldWhenDisabled", newMatchTest(1, true, feature.Disabled))
-		t.Run("ReturnsNewWhenEnabled", newMatchTest(2, true, feature.Enabled))
+		t.Run("ReturnsOldWhenDisabled", newMatchTest(1, true, false))
+		t.Run("ReturnsNewWhenEnabled", newMatchTest(2, true, true))
 	})
 
 	t.Run("Mismatch", func(t *testing.T) {
-		t.Run("ReturnsOldWhenDisabled", newMatchTest(1, false, feature.Disabled))
-		t.Run("ReturnsNewWhenEnabled", newMatchTest(2, false, feature.Enabled))
+		t.Run("ReturnsOldWhenDisabled", newMatchTest(1, false, false))
+		t.Run("ReturnsNewWhenEnabled", newMatchTest(2, false, true))
 	})
 
 	t.Run("EqualsIsCalledOnSuccess", func(t *testing.T) {
 		var set feature.Set
 
-		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
+		set.SetStrategy(feature.FixedStrategy(true))
 
 		f := set.New("case")
 
@@ -232,11 +232,11 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("EqualsIsNotCalledOnError", func(t *testing.T) {
 		var set feature.Set
 
-		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
+		set.SetStrategy(feature.FixedStrategy(true))
 
 		f := set.New("case")
 
-		for _, d := range []feature.Decision{feature.Disabled, feature.Enabled} {
+		for _, d := range []bool{false, true} {
 			var equalsCalled bool
 
 			equals := func(new, old int) bool {
@@ -278,7 +278,7 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("StrategyIsUsed", func(t *testing.T) {
 		var set feature.Set
 
-		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
+		set.SetStrategy(feature.FixedStrategy(true))
 
 		f := set.New("case")
 
@@ -359,7 +359,7 @@ func TestCase_Experiment(t *testing.T) {
 			t.Errorf("got n = %d, want %d", got, want)
 		}
 
-		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
+		set.SetStrategy(feature.FixedStrategy(true))
 
 		got, err = feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, nil },
@@ -389,7 +389,7 @@ func TestCase_Experiment(t *testing.T) {
 			t.Errorf("got n = %d, want %d", got, want)
 		}
 
-		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
+		set.SetStrategy(feature.FixedStrategy(true))
 
 		got, err = feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, errors.New("old failed") },
@@ -428,7 +428,7 @@ func TestCase_Switch(t *testing.T) {
 
 	testCases := []struct {
 		Name     string
-		Decision feature.Decision
+		Decision bool
 		Old      result
 		New      result
 		Expected result
@@ -440,25 +440,25 @@ func TestCase_Switch(t *testing.T) {
 		},
 		{
 			Name:     "Old",
-			Decision: feature.Disabled,
+			Decision: false,
 			Old:      result{N: 1},
 			Expected: result{N: 1},
 		},
 		{
 			Name:     "Old error",
-			Decision: feature.Disabled,
+			Decision: false,
 			Old:      result{Error: errors.New("test")},
 			Expected: result{Error: errors.New("test")},
 		},
 		{
 			Name:     "New",
-			Decision: feature.Enabled,
+			Decision: true,
 			New:      result{N: 2},
 			Expected: result{N: 2},
 		},
 		{
 			Name:     "New error",
-			Decision: feature.Enabled,
+			Decision: true,
 			New:      result{Error: errors.New("test")},
 			Expected: result{Error: errors.New("test")},
 		},
@@ -613,8 +613,8 @@ func TestFlag_Enabled(t *testing.T) {
 	t.Run("StrategyOnSet", func(t *testing.T) {
 		var set feature.Set
 		set.SetStrategy(feature.DecisionMap{
-			"enabled":  feature.Enabled,
-			"disabled": feature.Disabled,
+			"enabled":  true,
+			"disabled": false,
 		})
 		assertDisabled(t, set.New("disabled"))
 		assertEnabled(t, set.New("enabled"))
@@ -627,17 +627,17 @@ func TestFlag_Enabled(t *testing.T) {
 }
 
 func TestFixedStrategy(t *testing.T) {
-	assertDecision(t, feature.FixedStrategy(feature.Disabled), "test", feature.Disabled)
-	assertDecision(t, feature.FixedStrategy(feature.Enabled), "test", feature.Enabled)
+	assertDecision(t, feature.FixedStrategy(false), "test", false)
+	assertDecision(t, feature.FixedStrategy(true), "test", true)
 }
 
 func TestStrategyFunc_Enabled(t *testing.T) {
-	s := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) feature.Decision {
-		return feature.If(f.Name() == "Rob")
+	s := feature.StrategyFunc(func(_ context.Context, f *feature.Flag) bool {
+		return f.Name() == "Rob"
 	})
 
-	assertDecision(t, s, "Brad", feature.Disabled)
-	assertDecision(t, s, "Rob", feature.Enabled)
+	assertDecision(t, s, "Brad", false)
+	assertDecision(t, s, "Rob", true)
 }
 
 func ExampleDecisionMap() {
@@ -653,7 +653,7 @@ func ExampleDecisionMap() {
 
 	strategy := make(feature.DecisionMap, len(staticFlags))
 	for name, enabled := range staticFlags {
-		strategy[name] = feature.If(enabled)
+		strategy[name] = enabled
 	}
 
 	feature.SetStrategy(strategy)
@@ -661,15 +661,15 @@ func ExampleDecisionMap() {
 
 func TestDecisionMap_Enabled(t *testing.T) {
 	s := feature.DecisionMap{
-		"Brad": feature.Disabled,
-		"Rob":  feature.Enabled,
+		"Brad": false,
+		"Rob":  true,
 	}
 
-	assertDecision(t, s, "Brad", feature.Disabled)
-	assertDecision(t, s, "Rob", feature.Enabled)
+	assertDecision(t, s, "Brad", false)
+	assertDecision(t, s, "Rob", true)
 
 	assertPanic(t, func() {
-		assertDecision(t, s, "Disabled", feature.Disabled)
+		assertDecision(t, s, "Disabled", false)
 	})
 }
 
@@ -689,7 +689,7 @@ func assertDisabled(tb testing.TB, f *feature.Flag) {
 	}
 }
 
-func assertDecision(tb testing.TB, s feature.Strategy, name string, want feature.Decision) {
+func assertDecision(tb testing.TB, s feature.Strategy, name string, want bool) {
 	tb.Helper()
 
 	var set feature.Set
@@ -697,7 +697,7 @@ func assertDecision(tb testing.TB, s feature.Strategy, name string, want feature
 	f := set.New(name)
 
 	if got := s.Enabled(context.Background(), f); got != want {
-		tb.Errorf("got %q, want %q", got, want)
+		tb.Errorf("got %t, want %T", got, want)
 	}
 }
 

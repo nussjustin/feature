@@ -23,7 +23,7 @@ func loadPostOptimized(context.Context, int) (Post, error) { return Post{}, nil 
 var testerStrategy feature.Strategy
 
 // For use in examples
-func readFlags(string) map[string]feature.Decision {
+func readFlags(string) map[string]bool {
 	return nil
 }
 

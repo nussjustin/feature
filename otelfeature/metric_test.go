@@ -48,9 +48,9 @@ func TestTracer_Metrics(t *testing.T) {
 		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
-		tracer.Decision(ctx, flag, feature.Disabled)
-		tracer.Decision(ctx, flag, feature.Enabled)
-		tracer.Decision(ctx, flag, feature.Enabled)
+		tracer.Decision(ctx, flag, false)
+		tracer.Decision(ctx, flag, true)
+		tracer.Decision(ctx, flag, true)
 
 		meter.assertOnly("feature.decisions")
 
@@ -69,13 +69,13 @@ func TestTracer_Metrics(t *testing.T) {
 		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
-		_, f1 := tracer.ExperimentBranch(ctx, flag, feature.Disabled)
+		_, f1 := tracer.ExperimentBranch(ctx, flag, false)
 		f1(nil, nil)
-		_, f2 := tracer.ExperimentBranch(ctx, flag, feature.Enabled)
+		_, f2 := tracer.ExperimentBranch(ctx, flag, true)
 		f2(nil, errors.New("err2"))
-		_, f3 := tracer.ExperimentBranch(ctx, flag, feature.Enabled)
+		_, f3 := tracer.ExperimentBranch(ctx, flag, true)
 		f3(nil, nil)
-		_, f4 := tracer.ExperimentBranch(ctx, flag, feature.Disabled)
+		_, f4 := tracer.ExperimentBranch(ctx, flag, false)
 		f4(nil, nil)
 
 		meter.assertOnly("feature.case", "feature.case.failed")
@@ -104,15 +104,15 @@ func TestTracer_Metrics(t *testing.T) {
 		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
-		_, f1 := tracer.Experiment(ctx, flag, feature.Enabled)
+		_, f1 := tracer.Experiment(ctx, flag, true)
 		f1(nil, nil, true)
-		_, f2 := tracer.Experiment(ctx, flag, feature.Enabled)
+		_, f2 := tracer.Experiment(ctx, flag, true)
 		f2(nil, nil, false)
-		_, f3 := tracer.Experiment(ctx, flag, feature.Enabled)
+		_, f3 := tracer.Experiment(ctx, flag, true)
 		f3(nil, nil, false)
-		_, f4 := tracer.Experiment(ctx, flag, feature.Disabled)
+		_, f4 := tracer.Experiment(ctx, flag, false)
 		f4(nil, nil, false)
-		_, f5 := tracer.Experiment(ctx, flag, feature.Disabled)
+		_, f5 := tracer.Experiment(ctx, flag, false)
 		f5(nil, errors.New("err5"), false)
 
 		meter.assertOnly("feature.experiments", "feature.experiments.errors")
@@ -147,7 +147,7 @@ func TestTracer_Metrics(t *testing.T) {
 		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
-		tracer.Switch(ctx, flag, feature.Enabled)
+		tracer.Switch(ctx, flag, true)
 
 		meter.assertOnly()
 	})
@@ -222,6 +222,7 @@ func (t *testMeter) assertInt64(name string, want int64, attrs ...attribute.KeyV
 }
 
 func (t *testMeter) assertOnly(expected ...string) {
+	t.tb.Helper()
 	for name, c := range t.int64Counters {
 		if contains(expected, name) {
 			continue

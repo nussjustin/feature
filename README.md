@@ -120,16 +120,11 @@ func main() {
 }
 ```
 
-Both the global function and the method take one or more strategies. If all strategies are nil, checking a `Flag` will
-only use the default `Decision` set via `Config.Default`, which defaults to `Disabled`.
-
-Otherwise, all non-nil strategies are checked in order until one returns a final decision.
-
 The `Strategy` interface is defined as follows:
 
 ```go
 type Strategy interface {
-    Enabled(ctx context.Context, flag *Flag) Decision
+    Enabled(ctx context.Context, flag *Flag) bool
 }
 ```
 
@@ -139,7 +134,7 @@ The `Strategy` can be changed at any time during runtime. This can be useful for
 of all states in memory and periodically receive new states.
 
 For cases like this the [DecisionMap](https://pkg.go.dev/github.com/nussjustin/feature#DecisionMap) type can be useful,
-which returns a static `Decision` for each flag based on its name.
+which returns a static boolean for each flag based on its name.
 
 Example:
 
