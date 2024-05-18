@@ -61,7 +61,7 @@ func TestTracer_Tracing(t *testing.T) {
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
 			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
-			_, done := tracer.Branch(context.Background(), flag, feature.Enabled)
+			_, done := tracer.ExperimentBranch(context.Background(), flag, feature.Enabled)
 			done(nil, nil)
 
 			recordedSpan := getSpan(t, spanRecorder, "Enabled")
@@ -77,7 +77,7 @@ func TestTracer_Tracing(t *testing.T) {
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
 			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
-			_, done := tracer.Branch(context.Background(), flag, feature.Disabled)
+			_, done := tracer.ExperimentBranch(context.Background(), flag, feature.Disabled)
 			done(nil, errors.New("some error"))
 
 			recordedSpan := getSpan(t, spanRecorder, "Disabled")
@@ -85,23 +85,6 @@ func TestTracer_Tracing(t *testing.T) {
 			assertAttributeString(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureName, flag.Name())
 			assertSpanError(t, recordedSpan, "some error")
 		})
-	})
-
-	t.Run("Case Panicked", func(t *testing.T) {
-		flag := newFlag(t)
-
-		spanRecorder := tracetest.NewSpanRecorder()
-		provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
-		tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
-
-		ctx, span := provider.Tracer("").Start(context.Background(), "test")
-		tracer.BranchPanicked(ctx, flag, feature.Enabled, &feature.PanicError{
-			Recovered: "hello world",
-		})
-		span.End()
-
-		recordedSpan := getSpan(t, spanRecorder, "test")
-		assertEvent(t, recordedSpan, "panic", otelfeature.AttributeRecoveredValue.String("hello world"))
 	})
 
 	t.Run("Experiment", func(t *testing.T) {
@@ -112,8 +95,8 @@ func TestTracer_Tracing(t *testing.T) {
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
 			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
-			_, done := tracer.Experiment(context.Background(), flag)
-			done(feature.Enabled, nil, nil, true)
+			_, done := tracer.Experiment(context.Background(), flag, feature.Enabled)
+			done(nil, nil, true)
 
 			recordedSpan := getSpan(t, spanRecorder, flag.Name())
 			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureEnabled, true)
@@ -129,8 +112,8 @@ func TestTracer_Tracing(t *testing.T) {
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
 			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
-			_, done := tracer.Experiment(context.Background(), flag)
-			done(feature.Enabled, nil, errors.New("failed"), false)
+			_, done := tracer.Experiment(context.Background(), flag, feature.Enabled)
+			done(nil, errors.New("failed"), false)
 
 			recordedSpan := getSpan(t, spanRecorder, flag.Name())
 			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureEnabled, true)
@@ -148,8 +131,8 @@ func TestTracer_Tracing(t *testing.T) {
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
 			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
-			_, done := tracer.Run(context.Background(), flag)
-			done(feature.Enabled, nil, nil)
+			_, done := tracer.Switch(context.Background(), flag, feature.Enabled)
+			done(nil, nil)
 
 			recordedSpan := getSpan(t, spanRecorder, flag.Name())
 			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureEnabled, true)
@@ -164,8 +147,8 @@ func TestTracer_Tracing(t *testing.T) {
 			provider := trace.NewTracerProvider(trace.WithSpanProcessor(spanRecorder))
 			tracer, _ := otelfeature.Tracer(&otelfeature.Opts{TracerProvider: provider})
 
-			_, done := tracer.Run(context.Background(), flag)
-			done(feature.Enabled, nil, errors.New("failed"))
+			_, done := tracer.Switch(context.Background(), flag, feature.Enabled)
+			done(nil, errors.New("failed"))
 
 			recordedSpan := getSpan(t, spanRecorder, flag.Name())
 			assertAttributeBool(t, recordedSpan.Attributes(), otelfeature.AttributeFeatureEnabled, true)

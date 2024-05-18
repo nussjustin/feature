@@ -65,32 +65,28 @@ func combineTracers(metric, trace feature.Tracer) feature.Tracer {
 			trace.Decision(ctx, flag, decision)
 			metric.Decision(ctx, flag, decision)
 		},
-		Branch: func(ctx context.Context, flag *feature.Flag, decision feature.Decision) (context.Context, func(result any, err error)) {
-			ctx, traceDone := trace.Branch(ctx, flag, decision)
-			ctx, metricDone := metric.Branch(ctx, flag, decision)
+		Experiment: func(ctx context.Context, flag *feature.Flag, d feature.Decision) (context.Context, func(result any, err error, success bool)) {
+			ctx, traceDone := trace.Experiment(ctx, flag, d)
+			ctx, metricDone := metric.Experiment(ctx, flag, d)
+			return ctx, func(result any, err error, success bool) {
+				metricDone(result, err, success)
+				traceDone(result, err, success)
+			}
+		},
+		ExperimentBranch: func(ctx context.Context, flag *feature.Flag, decision feature.Decision) (context.Context, func(result any, err error)) {
+			ctx, traceDone := trace.ExperimentBranch(ctx, flag, decision)
+			ctx, metricDone := metric.ExperimentBranch(ctx, flag, decision)
 			return ctx, func(result any, err error) {
 				metricDone(result, err)
 				traceDone(result, err)
 			}
 		},
-		BranchPanicked: func(ctx context.Context, flag *feature.Flag, decision feature.Decision, panicError *feature.PanicError) {
-			trace.BranchPanicked(ctx, flag, decision, panicError)
-			metric.BranchPanicked(ctx, flag, decision, panicError)
-		},
-		Experiment: func(ctx context.Context, flag *feature.Flag) (context.Context, func(d feature.Decision, result any, err error, success bool)) {
-			ctx, traceDone := trace.Experiment(ctx, flag)
-			ctx, metricDone := metric.Experiment(ctx, flag)
-			return ctx, func(d feature.Decision, result any, err error, success bool) {
-				metricDone(d, result, err, success)
-				traceDone(d, result, err, success)
-			}
-		},
-		Run: func(ctx context.Context, flag *feature.Flag) (context.Context, func(d feature.Decision, result any, err error)) {
-			ctx, traceDone := trace.Run(ctx, flag)
-			ctx, metricDone := metric.Run(ctx, flag)
-			return ctx, func(d feature.Decision, result any, err error) {
-				metricDone(d, result, err)
-				traceDone(d, result, err)
+		Switch: func(ctx context.Context, flag *feature.Flag, d feature.Decision) (context.Context, func(result any, err error)) {
+			ctx, traceDone := trace.Switch(ctx, flag, d)
+			ctx, metricDone := metric.Switch(ctx, flag, d)
+			return ctx, func(result any, err error) {
+				metricDone(result, err)
+				traceDone(result, err)
 			}
 		},
 	}

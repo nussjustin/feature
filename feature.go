@@ -207,32 +207,28 @@ type Tracer struct {
 	// Decision is called every time [Flag.Enabled] is called.
 	Decision func(context.Context, *Flag, Decision)
 
-	// Branch is called for each called function during [Experiment] as well as for the function called by [Switch].
+	// Experiment is called at the beginning of every call to [Experiment].
+	//
+	// The returned function is called after both functions given to [Experiment] have returned and is passed
+	// the values that will be returned as well as a boolean that indicates if the experiment was successful (the
+	// results were equal and no errors occurred).
+	//
+	// The returned function can be nil.
+	Experiment func(context.Context, *Flag, Decision) (context.Context, func(result any, err error, success bool))
+
+	// ExperimentBranch is called for each called function during [Experiment] as well as for the function called by [Switch].
 	//
 	// The returned function is called after the called function has returned with the values returned by the function.
 	//
 	// The returned function can be nil.
-	Branch func(context.Context, *Flag, Decision) (context.Context, func(result any, err error))
+	ExperimentBranch func(context.Context, *Flag, Decision) (context.Context, func(result any, err error))
 
-	// BranchPanicked is called when a panic was caught as part of a function called by a [Case].
-	BranchPanicked func(ctx context.Context, flag *Flag, decision Decision, panicError *PanicError)
-
-	// Experiment is called at the beginning of every call to [Experiment].
+	// Switch is called at the beginning of every call to [Switch].
 	//
-	// The returned function is called after both functions given to [Experiment] have returned and is passed
-	// the [Decision] made by the given [Flag] and the values that will be returned as well as a boolean that indicates
-	// if the experiment was successful (the results were equal and no errors occurred).
+	// The returned function is called with the result that will be returned.
 	//
 	// The returned function can be nil.
-	Experiment func(context.Context, *Flag) (context.Context, func(d Decision, result any, err error, success bool))
-
-	// Run is called at the beginning of every call to [Switch].
-	//
-	// The returned function is called with the [Decision] made by the given [Flag] as well and the result that will
-	// be returned.
-	//
-	// The returned function can be nil.
-	Run func(context.Context, *Flag) (context.Context, func(d Decision, result any, err error))
+	Switch func(context.Context, *Flag, Decision) (context.Context, func(result any, err error))
 }
 
 // Equals returns a function that compares to values of the same type using ==.
@@ -242,35 +238,10 @@ func Equals[T comparable](a, b T) bool {
 	return a == b
 }
 
-// PanicError holds the error recovered from one of the called functions when running an experiment.
-type PanicError struct {
-	// Recovered is the value recovered from the panic.
-	Recovered any
-}
-
-var _ error = (*PanicError)(nil)
-
-// Error implements the error interface.
-func (p *PanicError) Error() string {
-	return fmt.Sprintf("recovered: %v", p.Recovered)
-}
-
-// Unwrap returns Recovered if Recovered is an error or nil otherwise.
-func (p *PanicError) Unwrap() error {
-	if err, ok := p.Recovered.(error); ok {
-		return err
-	}
-
-	return nil
-}
-
 // Experiment runs both an experimental and a control function concurrently and compares their results using equals.
 //
 // If the feature flag is enabled, the result of the experimental function will be returned, otherwise the result of the
 // control function will be returned.
-//
-// When a function panics the panic is caught and converted into an error that is or wraps a [PanicError] and treated
-// like a normal error.
 //
 // The given equals function is only called if there was no error.
 //
@@ -281,9 +252,11 @@ func Experiment[T any](ctx context.Context, flag *Flag,
 	control func(context.Context) (T, error),
 	equals func(new, old T) bool,
 ) (T, error) {
-	var done func(d Decision, result any, err error, success bool)
+	isEnabled := flag.Enabled(ctx)
+
+	var done func(result any, err error, success bool)
 	if t := flag.set.getTracer(); t.Experiment != nil {
-		ctx, done = t.Experiment(ctx, flag)
+		ctx, done = t.Experiment(ctx, flag, If(isEnabled))
 	}
 
 	var wg sync.WaitGroup
@@ -307,9 +280,6 @@ func Experiment[T any](ctx context.Context, flag *Flag,
 		controlT, controlErr = run(ctx, flag, Disabled, control)
 	}()
 
-	// Check status while the experiment runs. This can save some time if the used Strategy is slow.
-	isEnabled := flag.Enabled(ctx)
-
 	wg.Wait()
 
 	var result T
@@ -325,7 +295,7 @@ func Experiment[T any](ctx context.Context, flag *Flag,
 	ok := controlErr == nil && experimentErr == nil && equals(experimentT, controlT)
 
 	if done != nil {
-		done(If(isEnabled), result, err, ok)
+		done(result, err, ok)
 	}
 
 	return result, err
@@ -336,22 +306,22 @@ func Switch[T any](ctx context.Context, flag *Flag,
 	ifEnabled func(context.Context) (T, error),
 	ifDisabled func(context.Context) (T, error),
 ) (T, error) {
-	var done func(Decision, any, error)
-	if t := flag.set.getTracer(); t.Run != nil {
-		ctx, done = t.Run(ctx, flag)
-	}
-
 	enabled := flag.Enabled(ctx)
 
-	fn, d := ifDisabled, Disabled
-	if enabled {
-		fn, d = ifEnabled, Enabled
+	var done func(any, error)
+	if t := flag.set.getTracer(); t.Switch != nil {
+		ctx, done = t.Switch(ctx, flag, If(enabled))
 	}
 
-	resultT, err := run(ctx, flag, d, fn)
+	fn := ifDisabled
+	if enabled {
+		fn = ifEnabled
+	}
+
+	resultT, err := fn(ctx)
 
 	if done != nil {
-		done(d, resultT, err)
+		done(resultT, err)
 	}
 
 	return resultT, err
@@ -360,26 +330,14 @@ func Switch[T any](ctx context.Context, flag *Flag,
 func run[T any](ctx context.Context, flag *Flag, d Decision, f func(context.Context) (T, error)) (result T, err error) {
 	t := flag.set.getTracer()
 
-	if t.Branch != nil {
+	if t.ExperimentBranch != nil {
 		var done func(any, error)
-		ctx, done = t.Branch(ctx, flag, d)
+		ctx, done = t.ExperimentBranch(ctx, flag, d)
 
 		if done != nil {
 			defer func() { done(result, err) }()
 		}
 	}
-
-	defer func() {
-		if v := recover(); v != nil {
-			panicErr := &PanicError{Recovered: v}
-
-			if t.BranchPanicked != nil {
-				t.BranchPanicked(ctx, flag, d, panicErr)
-			}
-
-			err = panicErr
-		}
-	}()
 
 	return f(ctx)
 }

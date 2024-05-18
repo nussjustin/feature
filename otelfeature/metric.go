@@ -24,28 +24,24 @@ func newMetricTracer(opts *Opts) (feature.Tracer, error) {
 	caseFailedCounter, err2 := meter.Int64Counter("feature.case.failed",
 		metric.WithDescription("Number of failed case executions by flag name and decision"))
 
-	caseRecoveredCounter, err3 := meter.Int64Counter("feature.case.recovered",
-		metric.WithDescription("Number of panics recovered in cases by flag name and decision"))
-
-	decisionCounter, err4 := meter.Int64Counter("feature.decisions",
+	decisionCounter, err3 := meter.Int64Counter("feature.decisions",
 		metric.WithDescription("Number of decisions by flag name and decision"))
 
-	experimentCounter, err5 := meter.Int64Counter("feature.experiments",
+	experimentCounter, err4 := meter.Int64Counter("feature.experiments",
 		metric.WithDescription("Number of experiment executions by flag name, decision and success"))
 
-	experimentErrorsCounter, err6 := meter.Int64Counter("feature.experiments.errors",
+	experimentErrorsCounter, err5 := meter.Int64Counter("feature.experiments.errors",
 		metric.WithDescription("Number of experiment that returned errors by flag name and decision"))
 
-	if err := errors.Join(err1, err2, err3, err4, err5, err6); err != nil {
+	if err := errors.Join(err1, err2, err3, err4, err5); err != nil {
 		return feature.Tracer{}, err
 	}
 
 	return feature.Tracer{
-		Decision:       createMetricDecisionCallback(decisionCounter),
-		Branch:         createMetricCaseCallback(caseCounter, caseFailedCounter),
-		BranchPanicked: createMetricCasePanickedCallback(caseRecoveredCounter),
-		Experiment:     createMetricExperimentCallback(experimentCounter, experimentErrorsCounter),
-		Run:            createMetricRunCallback(),
+		Decision:         createMetricDecisionCallback(decisionCounter),
+		Experiment:       createMetricExperimentCallback(experimentCounter, experimentErrorsCounter),
+		ExperimentBranch: createMetricExperimentBranchCallback(caseCounter, caseFailedCounter),
+		Switch:           createMetricSwitchCallback(),
 	}, nil
 }
 
@@ -59,7 +55,7 @@ func createMetricDecisionCallback(
 	}
 }
 
-func createMetricCaseCallback(
+func createMetricExperimentBranchCallback(
 	caseCounter metric.Int64Counter,
 	caseFailedCounter metric.Int64Counter,
 ) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
@@ -78,22 +74,12 @@ func createMetricCaseCallback(
 	}
 }
 
-func createMetricCasePanickedCallback(
-	caseRecoveredCounter metric.Int64Counter,
-) func(context.Context, *feature.Flag, feature.Decision, *feature.PanicError) {
-	return func(ctx context.Context, flag *feature.Flag, decision feature.Decision, _ *feature.PanicError) {
-		caseRecoveredCounter.Add(ctx, 1, metric.WithAttributes(
-			AttributeFeatureEnabled.Bool(decision == feature.Enabled),
-			AttributeFeatureName.String(flag.Name())))
-	}
-}
-
 func createMetricExperimentCallback(
 	experimentCounter metric.Int64Counter,
 	experimentErrorsCounter metric.Int64Counter,
-) func(context.Context, *feature.Flag) (context.Context, func(feature.Decision, any, error, bool)) {
-	return func(ctx context.Context, flag *feature.Flag) (context.Context, func(feature.Decision, any, error, bool)) {
-		return ctx, func(d feature.Decision, _ any, err error, success bool) {
+) func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error, bool)) {
+	return func(ctx context.Context, flag *feature.Flag, d feature.Decision) (context.Context, func(any, error, bool)) {
+		return ctx, func(_ any, err error, success bool) {
 			experimentCounter.Add(ctx, 1, metric.WithAttributes(
 				AttributeExperimentSuccess.Bool(success),
 				AttributeFeatureEnabled.Bool(d == feature.Enabled),
@@ -108,9 +94,8 @@ func createMetricExperimentCallback(
 	}
 }
 
-func createMetricRunCallback() func(context.Context, *feature.Flag) (context.Context, func(feature.Decision, any, error)) {
-	return func(ctx context.Context, _ *feature.Flag) (context.Context, func(feature.Decision, any, error)) {
-		// We count cases so no need to check the run itself
-		return ctx, func(feature.Decision, any, error) {}
+func createMetricSwitchCallback() func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(result any, err error)) {
+	return func(ctx context.Context, _ *feature.Flag, _ feature.Decision) (context.Context, func(result any, err error)) {
+		return ctx, func(any, error) {}
 	}
 }

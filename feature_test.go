@@ -152,13 +152,13 @@ func TestSetTracer(t *testing.T) {
 		Decision: func(context.Context, *feature.Flag, feature.Decision) {
 			decisionCount++
 		},
-		Branch: func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
+		ExperimentBranch: func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
 			caseCount++
 			return context.Background(), func(any, error) {}
 		},
-		Run: func(context.Context, *feature.Flag) (context.Context, func(feature.Decision, any, error)) {
+		Switch: func(context.Context, *feature.Flag, feature.Decision) (context.Context, func(any, error)) {
 			runCount++
-			return context.Background(), func(feature.Decision, any, error) {}
+			return context.Background(), func(any, error) {}
 		},
 	})
 
@@ -168,7 +168,7 @@ func TestSetTracer(t *testing.T) {
 		func(context.Context) (int, error) { return 2, nil },
 		func(context.Context) (int, error) { return 1, nil })
 
-	if got, want := caseCount, 1; got != want {
+	if got, want := caseCount, 0; got != want {
 		t.Errorf("got %d calls to Case, want %d", got, want)
 	}
 
@@ -397,36 +397,6 @@ func TestCase_Experiment(t *testing.T) {
 		}
 	})
 
-	t.Run("PanicInOld", func(t *testing.T) {
-		var set feature.Set
-
-		f := set.New(named("case"))
-
-		got, err := feature.Experiment(context.Background(), f,
-			func(context.Context) (int, error) { return 2, nil },
-			func(context.Context) (int, error) { panic("old failed") },
-			feature.Equals[int])
-		if err == nil {
-			t.Error("got no error, want error")
-		}
-		if want := 0; got != want {
-			t.Errorf("got n = %d, want %d", got, want)
-		}
-
-		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
-
-		got, err = feature.Experiment(context.Background(), f,
-			func(context.Context) (int, error) { return 2, nil },
-			func(context.Context) (int, error) { panic("old failed") },
-			feature.Equals[int])
-		if err != nil {
-			t.Errorf("got error %q, want nil", err)
-		}
-		if want := 2; got != want {
-			t.Errorf("got n = %d, want %d", got, want)
-		}
-	})
-
 	t.Run("NewError", func(t *testing.T) {
 		var set feature.Set
 
@@ -453,36 +423,6 @@ func TestCase_Experiment(t *testing.T) {
 			t.Error("got no error, want error")
 		}
 		if want := 2; got != want {
-			t.Errorf("got n = %d, want %d", got, want)
-		}
-	})
-
-	t.Run("PanicInNew", func(t *testing.T) {
-		var set feature.Set
-
-		f := set.New(named("case"))
-
-		got, err := feature.Experiment(context.Background(), f,
-			func(context.Context) (int, error) { panic("old failed") },
-			func(context.Context) (int, error) { return 1, nil },
-			feature.Equals[int])
-		if err != nil {
-			t.Errorf("got error %q, want nil", err)
-		}
-		if want := 1; got != want {
-			t.Errorf("got n = %d, want %d", got, want)
-		}
-
-		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
-
-		got, err = feature.Experiment(context.Background(), f,
-			func(context.Context) (int, error) { panic("old failed") },
-			func(context.Context) (int, error) { return 1, nil },
-			feature.Equals[int])
-		if err == nil {
-			t.Error("got no error, want error")
-		}
-		if want := 0; got != want {
 			t.Errorf("got n = %d, want %d", got, want)
 		}
 	})
@@ -576,36 +516,6 @@ func TestCase_Run(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestCase_Run_Panic(t *testing.T) {
-	run := func(name string, want int, wantErr error, enabled, disabled func() (int, error)) {
-		t.Run(name, func(t *testing.T) {
-			var set feature.Set
-
-			ctx := context.Background()
-
-			f := set.New(named("case"))
-
-			n, err := feature.Switch(ctx, f,
-				func(ctx context.Context) (int, error) { return enabled() },
-				func(ctx context.Context) (int, error) { return disabled() })
-			assertError(t, wantErr, err)
-			if n != want {
-				t.Errorf("got n = %d, want %d", n, want)
-			}
-		})
-	}
-
-	errFailed := errors.New("failed")
-
-	run("Old panic", 0, errFailed,
-		func() (int, error) { return 2, nil },
-		func() (int, error) { panic(errFailed) })
-
-	run("New panic", 1, nil,
-		func() (int, error) { panic(errFailed) },
-		func() (int, error) { return 1, nil })
 }
 
 func TestCompare(t *testing.T) {

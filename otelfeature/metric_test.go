@@ -69,13 +69,13 @@ func TestTracer_Metrics(t *testing.T) {
 		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
-		_, f1 := tracer.Branch(ctx, flag, feature.Disabled)
+		_, f1 := tracer.ExperimentBranch(ctx, flag, feature.Disabled)
 		f1(nil, nil)
-		_, f2 := tracer.Branch(ctx, flag, feature.Enabled)
+		_, f2 := tracer.ExperimentBranch(ctx, flag, feature.Enabled)
 		f2(nil, errors.New("err2"))
-		_, f3 := tracer.Branch(ctx, flag, feature.Enabled)
+		_, f3 := tracer.ExperimentBranch(ctx, flag, feature.Enabled)
 		f3(nil, nil)
-		_, f4 := tracer.Branch(ctx, flag, feature.Disabled)
+		_, f4 := tracer.ExperimentBranch(ctx, flag, feature.Disabled)
 		f4(nil, nil)
 
 		meter.assertOnly("feature.case", "feature.case.failed")
@@ -100,35 +100,20 @@ func TestTracer_Metrics(t *testing.T) {
 			otelfeature.AttributeFeatureName.String(flag.Name()))
 	})
 
-	t.Run("Case Panicked", func(t *testing.T) {
-		flag := newFlag(t)
-
-		tracer, meter := createTracer(t)
-		tracer.BranchPanicked(ctx, flag, feature.Enabled, &feature.PanicError{})
-
-		meter.assertOnly("feature.case.recovered")
-
-		meter.assertInt64("feature.case.recovered", 1)
-
-		meter.assertInt64("feature.case.recovered", 1,
-			otelfeature.AttributeFeatureEnabled.Bool(true),
-			otelfeature.AttributeFeatureName.String(flag.Name()))
-	})
-
 	t.Run("Experiment", func(t *testing.T) {
 		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
-		_, f1 := tracer.Experiment(ctx, flag)
-		f1(feature.Enabled, nil, nil, true)
-		_, f2 := tracer.Experiment(ctx, flag)
-		f2(feature.Enabled, nil, nil, false)
-		_, f3 := tracer.Experiment(ctx, flag)
-		f3(feature.Enabled, nil, nil, false)
-		_, f4 := tracer.Experiment(ctx, flag)
-		f4(feature.Disabled, nil, nil, false)
-		_, f5 := tracer.Experiment(ctx, flag)
-		f5(feature.Disabled, nil, errors.New("err5"), false)
+		_, f1 := tracer.Experiment(ctx, flag, feature.Enabled)
+		f1(nil, nil, true)
+		_, f2 := tracer.Experiment(ctx, flag, feature.Enabled)
+		f2(nil, nil, false)
+		_, f3 := tracer.Experiment(ctx, flag, feature.Enabled)
+		f3(nil, nil, false)
+		_, f4 := tracer.Experiment(ctx, flag, feature.Disabled)
+		f4(nil, nil, false)
+		_, f5 := tracer.Experiment(ctx, flag, feature.Disabled)
+		f5(nil, errors.New("err5"), false)
 
 		meter.assertOnly("feature.experiments", "feature.experiments.errors")
 
@@ -162,7 +147,7 @@ func TestTracer_Metrics(t *testing.T) {
 		flag := newFlag(t)
 
 		tracer, meter := createTracer(t)
-		tracer.Run(ctx, flag)
+		tracer.Switch(ctx, flag, feature.Enabled)
 
 		meter.assertOnly()
 	})
