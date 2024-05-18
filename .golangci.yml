@@ -26,12 +26,12 @@ linters:
     - goconst
     - godot
     - gofumpt
-    - gomnd
     - gosec
     - gosmopolitan
     - loggercheck
     - makezero
     - misspell
+    - mnd
     - musttag
     - nilerr
     - noctx

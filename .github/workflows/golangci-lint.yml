@@ -14,4 +14,4 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Lint
         run: |
-          go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.57.2 run
+          go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.58.1 run
