@@ -20,10 +20,6 @@ import (
 	"github.com/nussjustin/feature"
 )
 
-func named(name string, desc ...string) feature.Config {
-	return feature.Config{Name: name, Description: strings.Join(desc, "")}
-}
-
 func ExampleIf() {
 	testerStrategy = feature.StrategyFunc(func(ctx context.Context, _ *feature.Flag) feature.Decision {
 		// Enable all flags for testers
@@ -64,9 +60,9 @@ func TestSetFlags(t *testing.T) {
 		t.Errorf("got %d flags, want %d", got, want)
 	}
 
-	f1 := feature.New(named("TestSetFlags/f1"))
-	f3 := feature.New(named("TestSetFlags/f3"))
-	f2 := feature.New(named("TestSetFlags/f2"))
+	f1 := feature.New("TestSetFlags/f1")
+	f3 := feature.New("TestSetFlags/f3")
+	f2 := feature.New("TestSetFlags/f2")
 
 	fs := feature.Flags()
 
@@ -100,9 +96,9 @@ func TestSetStrategy(t *testing.T) {
 		return feature.If(strings.ToUpper(trim(f.Name())) == trim(f.Name()))
 	})
 
-	lowerFlag := feature.New(named("TestSetStrategy/lower"))
-	mixedFlag := feature.New(named("TestSetStrategy/Mixed"))
-	upperFlag := feature.New(named("TestSetStrategy/UPPER"))
+	lowerFlag := feature.New("TestSetStrategy/lower")
+	mixedFlag := feature.New("TestSetStrategy/Mixed")
+	upperFlag := feature.New("TestSetStrategy/UPPER")
 
 	// Test initial setting
 	assertDisabled(t, lowerFlag)
@@ -162,7 +158,7 @@ func TestSetTracer(t *testing.T) {
 		},
 	})
 
-	f := feature.New(named("TestSetTracerProvider"))
+	f := feature.New("TestSetTracerProvider")
 
 	_, _ = feature.Switch(context.Background(), f,
 		func(context.Context) (int, error) { return 2, nil },
@@ -182,7 +178,8 @@ func TestSetTracer(t *testing.T) {
 }
 
 func ExampleExperiment() {
-	optimizationFlag := feature.New(named("optimize-posts-loading", "enables new query for loading posts"))
+	optimizationFlag := feature.New("optimize-posts-loading",
+		feature.WithDescription("enables new query for loading posts"))
 
 	// later
 
@@ -203,7 +200,7 @@ func TestCase_Experiment(t *testing.T) {
 			var set feature.Set
 			set.SetStrategy(feature.FixedStrategy(d))
 
-			f := set.New(named("case"))
+			f := set.New("case")
 
 			got, err := feature.Experiment(context.Background(), f,
 				func(context.Context) (int, error) { return 2, nil },
@@ -234,7 +231,7 @@ func TestCase_Experiment(t *testing.T) {
 
 		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
 
-		f := set.New(named("case"))
+		f := set.New("case")
 
 		var equalsCalled bool
 
@@ -258,7 +255,7 @@ func TestCase_Experiment(t *testing.T) {
 
 		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
 
-		f := set.New(named("case"))
+		f := set.New("case")
 
 		for _, d := range []feature.Decision{feature.Disabled, feature.Enabled} {
 			var equalsCalled bool
@@ -304,7 +301,7 @@ func TestCase_Experiment(t *testing.T) {
 
 		set.SetStrategy(feature.FixedStrategy(feature.Enabled))
 
-		f := set.New(named("case"))
+		f := set.New("case")
 
 		got, err := feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, nil },
@@ -322,7 +319,7 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("FunctionsAreCalledConcurrently", func(t *testing.T) {
 		var set feature.Set
 
-		f := set.New(named("case"))
+		f := set.New("case")
 
 		ping := make(chan int)
 		pong := make(chan int)
@@ -370,7 +367,7 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("OldError", func(t *testing.T) {
 		var set feature.Set
 
-		f := set.New(named("case"))
+		f := set.New("case")
 
 		got, err := feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, nil },
@@ -400,7 +397,7 @@ func TestCase_Experiment(t *testing.T) {
 	t.Run("NewError", func(t *testing.T) {
 		var set feature.Set
 
-		f := set.New(named("case"))
+		f := set.New("case")
 
 		got, err := feature.Experiment(context.Background(), f,
 			func(context.Context) (int, error) { return 2, errors.New("old failed") },
@@ -429,7 +426,8 @@ func TestCase_Experiment(t *testing.T) {
 }
 
 func ExampleSwitch() {
-	optimizationFlag := feature.New(named("optimize-posts-loading", "enables new query for loading posts"))
+	optimizationFlag := feature.New("optimize-posts-loading",
+		feature.WithDescription("enables new query for loading posts"))
 
 	// later
 
@@ -503,7 +501,7 @@ func TestCase_Run(t *testing.T) {
 
 			ctx := context.Background()
 
-			f := set.New(named("case"))
+			f := set.New("case")
 
 			n, err := feature.Switch(ctx, f,
 				func(ctx context.Context) (int, error) { return testCase.New.N, testCase.New.Error },
@@ -534,7 +532,7 @@ func TestCompare(t *testing.T) {
 
 func ExampleFlag() {
 	// Register flag. Most of the time this will be done globally.
-	newUiFlag := feature.New(named("new-ui", "enables the new web ui"))
+	newUiFlag := feature.New("new-ui", feature.WithDescription("enables the new web ui"))
 
 	// Load old and new UI templates
 	oldUI := template.Must(template.ParseGlob("templates/old/*.gotmpl"))
@@ -554,21 +552,27 @@ func ExampleFlag() {
 
 func TestNewFlag(t *testing.T) {
 	t.Run("FailsOnDuplicate", func(t *testing.T) {
-		feature.New(named("TestNewFlag/FailsOnDuplicate"))
+		feature.New("TestNewFlag/FailsOnDuplicate")
 
 		assertPanic(t, func() {
-			feature.New(named("TestNewFlag/FailsOnDuplicate"))
+			feature.New("TestNewFlag/FailsOnDuplicate")
 		})
 	})
 
 	t.Run("FailsEmptyName", func(t *testing.T) {
 		assertPanic(t, func() {
-			feature.New(named(""))
+			feature.New("")
 		})
 	})
 
 	t.Run("HasMetadata", func(t *testing.T) {
-		f := feature.New(named("TestNewFlag/HasMetadata", "some description"))
+		wantedLabels := map[string]any{"labelA": 1, "labelB": "2"}
+
+		labels := maps.Clone(wantedLabels)
+
+		f := feature.New("TestNewFlag/HasMetadata",
+			feature.WithDescription("some description"),
+			feature.WithLabels(labels))
 
 		if got, want := f.Name(), "TestNewFlag/HasMetadata"; got != want {
 			t.Errorf("got f.Name() = %q, want %q", got, want)
@@ -577,25 +581,34 @@ func TestNewFlag(t *testing.T) {
 		if got, want := f.Description(), "some description"; got != want {
 			t.Errorf("got f.Config() = %q, want %q", got, want)
 		}
+
+		labels["labelA"] = 2
+
+		labels = f.Labels()
+		labels["labelA"] = 3
+
+		if got, want := f.Labels(), wantedLabels; !maps.Equal(got, want) {
+			t.Errorf("got f.Config() = %#v, want %#v", got, want)
+		}
 	})
 }
 
 func TestRegisterFlag(t *testing.T) {
 	t.Run("FailsOnCaseWithSameName", func(t *testing.T) {
 		var set feature.Set
-		set.New(named("FailsOnCaseWithSameName"))
+		set.New("FailsOnCaseWithSameName")
 
 		assertPanic(t, func() {
-			set.New(named("FailsOnCaseWithSameName"))
+			set.New("FailsOnCaseWithSameName")
 		})
 	})
 
 	t.Run("FailsOnDuplicate", func(t *testing.T) {
 		var set feature.Set
-		set.New(named("FailsOnDuplicate"))
+		set.New("FailsOnDuplicate")
 
 		assertPanic(t, func() {
-			set.New(named("FailsOnDuplicate"))
+			set.New("FailsOnDuplicate")
 		})
 	})
 }
@@ -603,10 +616,7 @@ func TestRegisterFlag(t *testing.T) {
 func TestFlag_Labels(t *testing.T) {
 	var set feature.Set
 
-	f := set.New(feature.Config{
-		Name:   t.Name(),
-		Labels: map[string]any{"a": "b"},
-	})
+	f := set.New(t.Name(), feature.WithLabels(map[string]any{"a": "b"}))
 
 	if !maps.Equal(map[string]any{"a": "b"}, f.Labels()) {
 		t.Error("flag labels do not match configured labels")
@@ -624,7 +634,7 @@ func TestFlag_Labels(t *testing.T) {
 func TestFlag_Enabled(t *testing.T) {
 	t.Run("NoStrategy", func(t *testing.T) {
 		var set feature.Set
-		assertDisabled(t, set.New(named("disabled")))
+		assertDisabled(t, set.New("disabled"))
 	})
 
 	t.Run("StrategyOnSet", func(t *testing.T) {
@@ -633,21 +643,19 @@ func TestFlag_Enabled(t *testing.T) {
 			"enabled":  feature.Enabled,
 			"disabled": feature.Disabled,
 		})
-		assertDisabled(t, set.New(named("disabled")))
-		assertEnabled(t, set.New(named("enabled")))
-		assertDisabled(t, set.New(named("unknown")))
+		assertDisabled(t, set.New("disabled"))
+		assertEnabled(t, set.New("enabled"))
+		assertDisabled(t, set.New("unknown"))
 	})
 
 	t.Run("DefaultEnabled", func(t *testing.T) {
 		var set feature.Set
-		cfg := named("DefaultEnabled true")
-		cfg.DefaultEnabled = true
-		assertEnabled(t, set.New(cfg))
+		assertEnabled(t, set.New("DefaultEnabled", feature.WithDefaultEnabled()))
 	})
 
 	t.Run("NoDefaultEnabled", func(t *testing.T) {
 		var set feature.Set
-		assertDisabled(t, set.New(named("DefaultEnabled false")))
+		assertDisabled(t, set.New("Default"))
 	})
 }
 
@@ -716,7 +724,7 @@ func assertDecision(tb testing.TB, s feature.Strategy, name string, want feature
 
 	var set feature.Set
 
-	f := set.New(named(name))
+	f := set.New(name)
 
 	if got := s.Enabled(context.Background(), f); got != want {
 		tb.Errorf("got %q, want %q", got, want)

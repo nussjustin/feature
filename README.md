@@ -13,10 +13,7 @@ custom [Set](https://pkg.go.dev/github.com/nussjustin/feature#Set),
 `New` takes a name for the flag and an optional description.
 
 ```go
-var newUIFlag = feature.New(feature.Config{
-    Name: "new-ui",
-    Description: "enables the new UI",
-})
+var newUIFlag = feature.New("new-ui", feature.WithDescription("enables the new UI"))
 ```
 
 The status of the flag can be checked via the [Enabled](https://pkg.go.dev/github.com/nussjustin/feature#Flag.Enabled)
@@ -37,11 +34,7 @@ It is also possible to define a default state (called
 [Config.Default](https://pkg.go.dev/github.com/nussjustin/feature#Config.Default) field to the desired status.
 
 ```go
-var newUIFlag = feature.New(feature.Config{
-    Name: "new-ui",
-    Description: "enables the new UI",
-    Default: feature.Enabled,
-})
+var newUIFlag = feature.New("new-ui", feature.WithDescription("enables the new UI"), feature.WithDefaultEnabled())
 ```
 
 By default, a feature will be considered disabled unless the default is changed or a `Strategy` is used to make a
@@ -59,10 +52,7 @@ builtin tracing functionality.
 To use `Switch` first define a flag:
 
 ```go
-var newUIFlag = feature.New(feature.Config{
-    Name: "new-ui",
-    Description: "enables the new UI",
-})
+var newUIFlag = feature.New("new-ui", feature.WithDescription("enables the new UI"))
 ```
 
 Later in your code, just call `Switch` and pass the flag together with 2 callbacks, one for when the flag is enabled and
@@ -112,10 +102,7 @@ Example:
 ```go
 var mySet feature.Set // zero value is valid
 
-var optimizationFlag = mySet.New(feature.Config{
-    Name: "new-ui",
-    Description: "enables the new UI",
-})
+var optimizationFlag = mySet.New("new-ui", feature.WithDescription("enables the new UI"))
 ```
 
 ### Using dynamic strategies for controlling flags

@@ -9,22 +9,6 @@ import (
 	"sync/atomic"
 )
 
-// Config contains configuration for a feature flag including the flag name and a description.
-type Config struct {
-	// Name defines the name for the flag used for this feature.
-	Name string
-
-	// Description contains an optional, human-readable description of the feature.
-	Description string
-
-	// Labels can be used to add additional metadata to a feature.
-	Labels map[string]any
-
-	// DefaultEnabled, if true, causes the feature to be enabled by default when no explicit defaultDecision can be made for
-	// (either because no [Strategy] was set or because the final defaultDecision was [NoDecision]).
-	DefaultEnabled bool
-}
-
 // Decision is an enum of the potential decisions a [Strategy] can make on whether a [Flag] should be enabled or not.
 //
 // Through the global [FixedStrategy] function, a [Decision] can be used directly as [Strategy], which can be useful
@@ -69,7 +53,7 @@ func (m DecisionMap) Enabled(_ context.Context, flag *Flag) Decision {
 // Set manages feature flags and can provide a [Strategy] (using [SetStrategy]) for making dynamic decisions about
 // a flags' status.
 //
-// The zero value is usable as is, defaulting to all flags being disabled unless [Config.DefaultEnabled] is set.
+// The zero value is usable as is, returning the default for all flags.
 type Set struct {
 	strategy atomic.Pointer[Strategy]
 	tracer   atomic.Pointer[Tracer]
@@ -83,19 +67,19 @@ var globalSet Set
 // New registers and returns a new [Flag] with the global [Set].
 //
 // See [Set.New] for more details.
-func New(c Config) *Flag {
-	return globalSet.New(c)
+func New(name string, opts ...FlagOpt) *Flag {
+	return globalSet.New(name, opts...)
 }
 
 // New registers and returns a new [Flag] on s.
 //
 // If the given name is empty or already registered, New will panic.
-func (s *Set) New(c Config) *Flag {
-	if c.Name == "" {
+func (s *Set) New(name string, opts ...FlagOpt) *Flag {
+	if name == "" {
 		panic("missing name for flag")
 	}
 
-	return s.newFlag(c)
+	return s.newFlag(name, opts)
 }
 
 // SetStrategy sets or removes the [Strategy] for the global [Set].
@@ -170,13 +154,14 @@ func (s *Set) Flags() []*Flag {
 	return fs
 }
 
-func (s *Set) newFlag(c Config) *Flag {
+func (s *Set) newFlag(name string, opts []FlagOpt) *Flag {
 	f := &Flag{
-		set:             s,
-		name:            c.Name,
-		description:     c.Description,
-		defaultDecision: If(c.DefaultEnabled),
-		labels:          maps.Clone(c.Labels),
+		set:  s,
+		name: name,
+	}
+
+	for _, opt := range opts {
+		opt(f)
 	}
 
 	s.mu.Lock()
@@ -186,11 +171,11 @@ func (s *Set) newFlag(c Config) *Flag {
 		s.flags = map[string]*Flag{}
 	}
 
-	if _, ok := s.flags[c.Name]; ok {
-		panic(fmt.Sprintf("name %q already in use", c.Name))
+	if _, ok := s.flags[name]; ok {
+		panic(fmt.Sprintf("name %q already in use", name))
 	}
 
-	s.flags[c.Name] = f
+	s.flags[name] = f
 
 	return f
 }
@@ -342,6 +327,33 @@ func run[T any](ctx context.Context, flag *Flag, d Decision, f func(context.Cont
 	return f(ctx)
 }
 
+type FlagOpt func(*Flag)
+
+// WithDefaultEnabled causes a flag to be enabled by default.
+func WithDefaultEnabled() FlagOpt {
+	return func(f *Flag) {
+		f.defaultEnabled = true
+	}
+}
+
+// WithDescription sets the description for a new flag.
+func WithDescription(desc string) FlagOpt {
+	return func(f *Flag) {
+		f.description = desc
+	}
+}
+
+// WithLabels adds the given labels to a new flag.
+func WithLabels(l map[string]any) FlagOpt {
+	return func(f *Flag) {
+		if f.labels == nil {
+			f.labels = maps.Clone(l)
+		} else {
+			maps.Copy(f.labels, l)
+		}
+	}
+}
+
 // Flag represents a feature flag that can be enabled or disabled (toggled) dynamically at runtime and used to control
 // the behaviour of an application, for example by dynamically changing code paths (see [Experiment] and [Switch]).
 //
@@ -351,10 +363,10 @@ func run[T any](ctx context.Context, flag *Flag, d Decision, f func(context.Cont
 type Flag struct {
 	set *Set
 
-	name            string
-	description     string
-	defaultDecision Decision
-	labels          map[string]any
+	name           string
+	description    string
+	defaultEnabled bool
+	labels         map[string]any
 }
 
 func (f *Flag) trace(ctx context.Context, d Decision) {
@@ -395,14 +407,14 @@ func (f *Flag) Description() string {
 	return f.description
 }
 
-// Labels returns the labels associated with this feature.
+// Labels returns a copy of the labels associated with this feature.
 func (f *Flag) Labels() map[string]any {
 	return maps.Clone(f.labels)
 }
 
-// Default returns the default defaultDecision configured for this feature.
+// Default returns the default [Decision] configured for this feature.
 func (f *Flag) Default() Decision {
-	return f.defaultDecision
+	return If(f.defaultEnabled)
 }
 
 // Strategy defines an interface used for deciding on whether a feature is enabled or not.
