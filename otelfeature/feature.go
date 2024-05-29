@@ -12,7 +12,7 @@ import (
 
 const (
 	namespace = "github.com/nussjustin/feature/otelfeature"
-	version   = "0.1.0"
+	version   = "0.5.1"
 )
 
 const (
