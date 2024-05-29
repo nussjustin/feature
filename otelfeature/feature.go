@@ -24,9 +24,6 @@ const (
 
 	// AttributeExperimentSuccess is true if an experiment ran with not errors and the results are considered equal.
 	AttributeExperimentSuccess = attribute.Key("feature.experiment.success")
-
-	// AttributeRecoveredValue contains the recovered value from a panic converted into a string using fmt.Sprint.
-	AttributeRecoveredValue = attribute.Key("feature.case.recovered")
 )
 
 // Opts can be used to customize the [feature.Tracer] returned by [Tracer].
