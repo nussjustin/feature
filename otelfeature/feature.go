@@ -12,18 +12,15 @@ import (
 
 const (
 	namespace = "github.com/nussjustin/feature/otelfeature"
-	version   = "0.5.1"
+	version   = "0.6.0"
 )
 
 const (
-	// AttributeFeatureEnabled is true if a flag was enabled or if running the experimental case in an Experiment.
+	// AttributeFeatureEnabled is true if a flag was enabled.
 	AttributeFeatureEnabled = attribute.Key("true")
 
 	// AttributeFeatureName contains the name of the used feature flag.
 	AttributeFeatureName = attribute.Key("feature.name")
-
-	// AttributeExperimentSuccess is true if an experiment ran with not errors and the results are considered equal.
-	AttributeExperimentSuccess = attribute.Key("feature.experiment.success")
 )
 
 // Opts can be used to customize the [feature.Tracer] returned by [Tracer].
@@ -61,22 +58,6 @@ func combineTracers(metric, trace feature.Tracer) feature.Tracer {
 		Decision: func(ctx context.Context, flag *feature.Flag, enabled bool) {
 			trace.Decision(ctx, flag, enabled)
 			metric.Decision(ctx, flag, enabled)
-		},
-		Experiment: func(ctx context.Context, flag *feature.Flag, enabled bool) (context.Context, func(result any, err error, success bool)) {
-			ctx, traceDone := trace.Experiment(ctx, flag, enabled)
-			ctx, metricDone := metric.Experiment(ctx, flag, enabled)
-			return ctx, func(result any, err error, success bool) {
-				metricDone(result, err, success)
-				traceDone(result, err, success)
-			}
-		},
-		ExperimentBranch: func(ctx context.Context, flag *feature.Flag, enabled bool) (context.Context, func(result any, err error)) {
-			ctx, traceDone := trace.ExperimentBranch(ctx, flag, enabled)
-			ctx, metricDone := metric.ExperimentBranch(ctx, flag, enabled)
-			return ctx, func(result any, err error) {
-				metricDone(result, err)
-				traceDone(result, err)
-			}
 		},
 		Switch: func(ctx context.Context, flag *feature.Flag, enabled bool) (context.Context, func(result any, err error)) {
 			ctx, traceDone := trace.Switch(ctx, flag, enabled)

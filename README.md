@@ -76,26 +76,6 @@ tmpl, err := feature.Switch(ctx, newUIFlag,
 	func(context.Context) (*template.Template, error) { return template.Parse("old-ui/*.gotmpl") })
 ```
 
-### Running an experiment
-
-In addition to simply switching between two functions using `Switch`, it is also possible to run both two functions
-concurrently and compare their results in order to compare code paths.
-
-To do this use the global [Experiment](https://pkg.go.dev/github.com/nussjustin/feature#Experiment) function and pass
-the feature flag, two functions that will be run and a callback to compare the results.
-
-Calling `Experiment` will automatically run both functions and compare the results and pass the result of the
-comparison to the `Tracer.Experiment` function of the configured `Tracer`, if any.
-
-The result of `Experiment` depends on the result of checking the flags status. If the flag is enabled, the results of
-the first function is returned. Otherwise the results of the second function are returned.
-
-Example:
-
-```go
-result, err := feature.Experiment(ctx, optimizationFlag, optimizedFunction, unoptimizedFunction, feature.Equals)
-```
-
 ### Using different sets of flags
 
 All flags and cases created via `New` belong to a single global set of flags.
@@ -165,7 +145,7 @@ func main() {
 ### OpenTelemetry integration
 
 The `otelfeature` package exposes a function that returns pre-configured `Tracer` that implements basic metrics and
-tracing for `Flag`s as well as the global `Switch` and `Experiment` functions using [OpenTelemetry](https://opentelemetry.io/).
+tracing for `Flag`s as well as the global `Switch` function using [OpenTelemetry](https://opentelemetry.io/).
 
 In order to enable metrics collection and tracing use the global
 [otelfeature.Tracer](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature#Tracer) function to create a new

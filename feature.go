@@ -144,8 +144,7 @@ func (s *Set) newFlag(name string, opts []FlagOpt) *Flag {
 	return f
 }
 
-// Tracer can be used to trace the use of calls to [Flag.Enabled] as well as the global helper functions [Experiment]
-// and [Switch].
+// Tracer can be used to trace the use of calls to [Flag.Enabled] as well as the global helper function [Switch].
 //
 // See the documentation on each field for information on what can be traced.
 //
@@ -156,98 +155,12 @@ type Tracer struct {
 	// Decision is called every time [Flag.Enabled] is called.
 	Decision func(ctx context.Context, f *Flag, enabled bool)
 
-	// Experiment is called at the beginning of every call to [Experiment].
-	//
-	// The returned function is called after both functions given to [Experiment] have returned and is passed
-	// the values that will be returned as well as a boolean that indicates if the experiment was successful (the
-	// results were equal and no errors occurred).
-	//
-	// The returned function can be nil.
-	Experiment func(ctx context.Context, f *Flag, enabled bool) (context.Context, func(result any, err error, success bool))
-
-	// ExperimentBranch is called for each called function during [Experiment] as well as for the function called by [Switch].
-	//
-	// The returned function is called after the called function has returned with the values returned by the function.
-	//
-	// The returned function can be nil.
-	ExperimentBranch func(ctx context.Context, f *Flag, enabled bool) (context.Context, func(result any, err error))
-
 	// Switch is called at the beginning of every call to [Switch].
 	//
 	// The returned function is called with the result that will be returned.
 	//
 	// The returned function can be nil.
 	Switch func(ctx context.Context, f *Flag, enabled bool) (context.Context, func(result any, err error))
-}
-
-// Equals returns a function that compares to values of the same type using ==.
-//
-// This can be used with [Experiment] when T is a comparable type.
-func Equals[T comparable](a, b T) bool {
-	return a == b
-}
-
-// Experiment runs both an experimental and a control function concurrently and compares their results using equals.
-//
-// If the feature flag is enabled, the result of the experimental function will be returned, otherwise the result of the
-// control function will be returned.
-//
-// The given equals function is only called if there was no error.
-//
-// When using values of a type that is comparable using ==, the global function [Equals] can be used to create the
-// comparison function.
-func Experiment[T any](ctx context.Context, flag *Flag,
-	experimental func(context.Context) (T, error),
-	control func(context.Context) (T, error),
-	equals func(new, old T) bool,
-) (T, error) {
-	enabled := flag.Enabled(ctx)
-
-	var done func(result any, err error, success bool)
-	if t := flag.set.getTracer(); t.Experiment != nil {
-		ctx, done = t.Experiment(ctx, flag, enabled)
-	}
-
-	var wg sync.WaitGroup
-	var (
-		experimentT   T
-		experimentErr error
-
-		controlT   T
-		controlErr error
-	)
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		experimentT, experimentErr = run(ctx, flag, true, experimental)
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		controlT, controlErr = run(ctx, flag, false, control)
-	}()
-
-	wg.Wait()
-
-	var result T
-	var err error
-
-	if enabled {
-		result, err = experimentT, experimentErr
-	} else {
-		result, err = controlT, controlErr
-	}
-
-	// Always compare, even if we don't use the result (done is nil).
-	ok := controlErr == nil && experimentErr == nil && equals(experimentT, controlT)
-
-	if done != nil {
-		done(result, err, ok)
-	}
-
-	return result, err
 }
 
 // Switch checks if the associated flag is enabled and runs either ifEnabled or ifDisabled and returns their result.
@@ -276,21 +189,6 @@ func Switch[T any](ctx context.Context, flag *Flag,
 	return resultT, err
 }
 
-func run[T any](ctx context.Context, flag *Flag, enabled bool, f func(context.Context) (T, error)) (result T, err error) {
-	t := flag.set.getTracer()
-
-	if t.ExperimentBranch != nil {
-		var done func(any, error)
-		ctx, done = t.ExperimentBranch(ctx, flag, enabled)
-
-		if done != nil {
-			defer func() { done(result, err) }()
-		}
-	}
-
-	return f(ctx)
-}
-
 type FlagOpt func(*Flag)
 
 // WithDescription sets the description for a new flag.
@@ -312,7 +210,7 @@ func WithLabels(l map[string]any) FlagOpt {
 }
 
 // Flag represents a feature flag that can be enabled or disabled (toggled) dynamically at runtime and used to control
-// the behaviour of an application, for example by dynamically changing code paths (see [Experiment] and [Switch]).
+// the behaviour of an application, for example by dynamically changing code paths (see [Switch]).
 //
 // A Flag must be obtained using either [New] or [Set.New].
 type Flag struct {

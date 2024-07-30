@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/nussjustin/feature"
 	"html/template"
 	"log"
 	"maps"
@@ -15,9 +16,6 @@ import (
 	"strings"
 	"syscall"
 	"testing"
-	"time"
-
-	"github.com/nussjustin/feature"
 )
 
 func ExampleIf() {
@@ -116,15 +114,11 @@ func TestSetStrategy(t *testing.T) {
 }
 
 func TestSetTracer(t *testing.T) {
-	var caseCount, decisionCount, runCount int
+	var decisionCount, runCount int
 
 	feature.SetTracer(feature.Tracer{
 		Decision: func(context.Context, *feature.Flag, bool) {
 			decisionCount++
-		},
-		ExperimentBranch: func(context.Context, *feature.Flag, bool) (context.Context, func(any, error)) {
-			caseCount++
-			return context.Background(), func(any, error) {}
 		},
 		Switch: func(context.Context, *feature.Flag, bool) (context.Context, func(any, error)) {
 			runCount++
@@ -138,268 +132,13 @@ func TestSetTracer(t *testing.T) {
 		func(context.Context) (int, error) { return 2, nil },
 		func(context.Context) (int, error) { return 1, nil })
 
-	if got, want := caseCount, 0; got != want {
-		t.Errorf("got %d calls to Case, want %d", got, want)
-	}
-
 	if got, want := decisionCount, 1; got != want {
 		t.Errorf("got %d calls to Decision, want %d", got, want)
 	}
 
 	if got, want := runCount, 1; got != want {
-		t.Errorf("got %d calls to Experiment, want %d", got, want)
+		t.Errorf("got %d calls to Switch, want %d", got, want)
 	}
-}
-
-func ExampleExperiment() {
-	optimizationFlag := feature.New("optimize-posts-loading",
-		feature.WithDescription("enables new query for loading posts"))
-
-	// later
-
-	post, err := feature.Experiment(myCtx, optimizationFlag,
-		func(ctx context.Context) (Post, error) { return loadPostOptimized(ctx, postId) },
-		func(ctx context.Context) (Post, error) { return loadPost(ctx, postId) },
-		feature.Equals[Post])
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(post)
-}
-
-func TestCase_Experiment(t *testing.T) {
-	newMatchTest := func(want int, equals bool, d bool) func(*testing.T) {
-		return func(t *testing.T) {
-			var set feature.Set
-			set.SetStrategy(feature.FixedStrategy(d))
-
-			f := set.New("case")
-
-			got, err := feature.Experiment(context.Background(), f,
-				func(context.Context) (int, error) { return 2, nil },
-				func(context.Context) (int, error) { return 1, nil },
-				// pretend that both results are equal
-				func(new, old int) bool { return equals })
-			if err != nil {
-				t.Errorf("got error %q, want nil", err)
-			}
-			if got != want {
-				t.Errorf("got n = %d, want %d", got, want)
-			}
-		}
-	}
-
-	t.Run("Match", func(t *testing.T) {
-		t.Run("ReturnsOldWhenDisabled", newMatchTest(1, true, false))
-		t.Run("ReturnsNewWhenEnabled", newMatchTest(2, true, true))
-	})
-
-	t.Run("Mismatch", func(t *testing.T) {
-		t.Run("ReturnsOldWhenDisabled", newMatchTest(1, false, false))
-		t.Run("ReturnsNewWhenEnabled", newMatchTest(2, false, true))
-	})
-
-	t.Run("EqualsIsCalledOnSuccess", func(t *testing.T) {
-		var set feature.Set
-
-		set.SetStrategy(feature.FixedStrategy(true))
-
-		f := set.New("case")
-
-		var equalsCalled bool
-
-		_, _ = feature.Experiment(context.Background(), f,
-			func(context.Context) (int, error) { return 2, nil },
-			func(context.Context) (int, error) { return 1, nil },
-			// pretend that both results are equal
-			func(new, old int) bool {
-				equalsCalled = true
-
-				return true
-			})
-
-		if !equalsCalled {
-			t.Errorf("equals was not called")
-		}
-	})
-
-	t.Run("EqualsIsNotCalledOnError", func(t *testing.T) {
-		var set feature.Set
-
-		set.SetStrategy(feature.FixedStrategy(true))
-
-		f := set.New("case")
-
-		for _, d := range []bool{false, true} {
-			var equalsCalled bool
-
-			equals := func(new, old int) bool {
-				equalsCalled = true
-				return true
-			}
-
-			// Equals should not be called if any of the functions returns an error, even if it's not the enabled
-			// function.
-
-			{
-				set.SetStrategy(feature.FixedStrategy(d))
-
-				_, _ = feature.Experiment(context.Background(), f,
-					func(context.Context) (int, error) { return 2, errors.New("error 2") },
-					func(context.Context) (int, error) { return 1, nil },
-					equals)
-
-				if equalsCalled {
-					t.Errorf("equals was called")
-				}
-			}
-
-			{
-				set.SetStrategy(feature.FixedStrategy(d))
-
-				_, _ = feature.Experiment(context.Background(), f,
-					func(context.Context) (int, error) { return 2, nil },
-					func(context.Context) (int, error) { return 1, errors.New("error 1") },
-					equals)
-
-				if equalsCalled {
-					t.Errorf("equals was called")
-				}
-			}
-		}
-	})
-
-	t.Run("StrategyIsUsed", func(t *testing.T) {
-		var set feature.Set
-
-		set.SetStrategy(feature.FixedStrategy(true))
-
-		f := set.New("case")
-
-		got, err := feature.Experiment(context.Background(), f,
-			func(context.Context) (int, error) { return 2, nil },
-			func(context.Context) (int, error) { return 1, nil },
-			// pretend that both results are equal
-			func(new, old int) bool { return true })
-		if err != nil {
-			t.Errorf("got error %q, want nil", err)
-		}
-		if want := 2; got != want {
-			t.Errorf("got n = %d, want %d", got, want)
-		}
-	})
-
-	t.Run("FunctionsAreCalledConcurrently", func(t *testing.T) {
-		var set feature.Set
-		set.SetStrategy(feature.FixedStrategy(false))
-
-		f := set.New("case")
-
-		ping := make(chan int)
-		pong := make(chan int)
-
-		got, err := feature.Experiment(context.Background(), f,
-			func(context.Context) (int, error) {
-				select {
-				case ping <- 1:
-				case <-time.After(time.Second):
-					return 0, errors.New("timeout sending in new")
-				}
-
-				select {
-				case <-pong:
-				case <-time.After(time.Second):
-					return 0, errors.New("timeout receiving in new")
-				}
-
-				return 2, nil
-			},
-			func(context.Context) (int, error) {
-				select {
-				case <-ping:
-				case <-time.After(time.Second):
-					return 0, errors.New("timeout receiving in old")
-				}
-
-				select {
-				case pong <- 2:
-				case <-time.After(time.Second):
-					return 0, errors.New("timeout sending in old")
-				}
-
-				return 1, nil
-			},
-			feature.Equals[int])
-		if err != nil {
-			t.Errorf("got error %q, want nil", err)
-		}
-		if want := 1; got != want {
-			t.Errorf("got n = %d, want %d", got, want)
-		}
-	})
-
-	t.Run("OldError", func(t *testing.T) {
-		var set feature.Set
-		set.SetStrategy(feature.FixedStrategy(false))
-
-		f := set.New("case")
-
-		got, err := feature.Experiment(context.Background(), f,
-			func(context.Context) (int, error) { return 2, nil },
-			func(context.Context) (int, error) { return 1, errors.New("old failed") },
-			feature.Equals[int])
-		if err == nil {
-			t.Error("got no error, want error")
-		}
-		if want := 1; got != want {
-			t.Errorf("got n = %d, want %d", got, want)
-		}
-
-		set.SetStrategy(feature.FixedStrategy(true))
-
-		got, err = feature.Experiment(context.Background(), f,
-			func(context.Context) (int, error) { return 2, nil },
-			func(context.Context) (int, error) { return 1, errors.New("old failed") },
-			feature.Equals[int])
-		if err != nil {
-			t.Errorf("got error %q, want nil", err)
-		}
-		if want := 2; got != want {
-			t.Errorf("got n = %d, want %d", got, want)
-		}
-	})
-
-	t.Run("NewError", func(t *testing.T) {
-		var set feature.Set
-		set.SetStrategy(feature.FixedStrategy(false))
-
-		f := set.New("case")
-
-		got, err := feature.Experiment(context.Background(), f,
-			func(context.Context) (int, error) { return 2, errors.New("old failed") },
-			func(context.Context) (int, error) { return 1, nil },
-			feature.Equals[int])
-		if err != nil {
-			t.Errorf("got error %q, want nil", err)
-		}
-		if want := 1; got != want {
-			t.Errorf("got n = %d, want %d", got, want)
-		}
-
-		set.SetStrategy(feature.FixedStrategy(true))
-
-		got, err = feature.Experiment(context.Background(), f,
-			func(context.Context) (int, error) { return 2, errors.New("old failed") },
-			func(context.Context) (int, error) { return 1, nil },
-			feature.Equals[int])
-		if err == nil {
-			t.Error("got no error, want error")
-		}
-		if want := 2; got != want {
-			t.Errorf("got n = %d, want %d", got, want)
-		}
-	})
 }
 
 func ExampleSwitch() {
@@ -484,20 +223,6 @@ func TestCase_Switch(t *testing.T) {
 				t.Errorf("got n = %d, want %d", n, testCase.Expected.N)
 			}
 		})
-	}
-}
-
-func TestCompare(t *testing.T) {
-	if feature.Equals(1, 3) {
-		t.Error("got feature.Equals(1, 3) = true")
-	}
-
-	if feature.Equals("test", "Test") {
-		t.Error("got feature.Equals(\"test\", \"Test\") = true")
-	}
-
-	if !feature.Equals("test", "test") {
-		t.Error("got feature.Equals(\"test\", \"test\") = false")
 	}
 }
 
