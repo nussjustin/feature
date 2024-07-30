@@ -43,14 +43,14 @@ var globalSet Set
 // New registers and returns a new [Flag] with the global [Set].
 //
 // See [Set.New] for more details.
-func New(name string, opts ...FlagOpt) *Flag {
+func New(name string, opts ...Option) *Flag {
 	return globalSet.New(name, opts...)
 }
 
 // New registers and returns a new [Flag] on s.
 //
 // If the given name is empty or already registered, New will panic.
-func (s *Set) New(name string, opts ...FlagOpt) *Flag {
+func (s *Set) New(name string, opts ...Option) *Flag {
 	if name == "" {
 		panic("missing name for flag")
 	}
@@ -118,7 +118,7 @@ func (s *Set) Flags() []*Flag {
 	return fs
 }
 
-func (s *Set) newFlag(name string, opts []FlagOpt) *Flag {
+func (s *Set) newFlag(name string, opts []Option) *Flag {
 	f := &Flag{
 		set:  s,
 		name: name,
@@ -189,17 +189,17 @@ func Switch[T any](ctx context.Context, flag *Flag,
 	return resultT, err
 }
 
-type FlagOpt func(*Flag)
+type Option func(*Flag)
 
 // WithDescription sets the description for a new flag.
-func WithDescription(desc string) FlagOpt {
+func WithDescription(desc string) Option {
 	return func(f *Flag) {
 		f.description = desc
 	}
 }
 
 // WithLabels adds the given labels to a new flag.
-func WithLabels(l map[string]any) FlagOpt {
+func WithLabels(l map[string]any) Option {
 	return func(f *Flag) {
 		if f.labels == nil {
 			f.labels = maps.Clone(l)
