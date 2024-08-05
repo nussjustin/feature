@@ -1,4 +1,2 @@
-/*
-Package feature provides a simple, easy to use abstraction for working with feature flags in Go.
-*/
+// Package feature implements a simple abstraction for feature flags with dynamic values.
 package feature

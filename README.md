@@ -1,164 +1,88 @@
 # feature [![Go Reference](https://pkg.go.dev/badge/github.com/nussjustin/feature.svg)](https://pkg.go.dev/github.com/nussjustin/feature) [![Lint](https://github.com/nussjustin/feature/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/nussjustin/feature/actions/workflows/golangci-lint.yml) [![Test](https://github.com/nussjustin/feature/actions/workflows/test.yml/badge.svg)](https://github.com/nussjustin/feature/actions/workflows/test.yml)
 
-Package feature provides a simple, easy to use abstraction for working with feature flags in Go.
+Package feature implements a simple abstraction for feature flags with arbitrary values.
 
 ## Examples
 
-### Defining and checking a flag
+### Registering a flag
 
-To define a flag use the global [New](https://pkg.go.dev/github.com/nussjustin/feature#New) function or, when using a
-custom [Set](https://pkg.go.dev/github.com/nussjustin/feature#Set),
-[Set.New](https://pkg.go.dev/github.com/nussjustin/feature#Set.New).
+A flag is registered on a [FlagSet][0].
 
-`New` takes a name for the flag and an optional description.
+Flags are created using a specific method based on the type of the value of the flag, named after the type.
+
+Currently, the supported methods are
+
+* [FlagSet.Bool][1] for boolean flags,
+* [FlagSet.Float][2] for float flags,
+* [FlagSet.Int][3] for int flags and
+* [FlagSet.String][4] for string flags.
+
+Each method will return a callback that takes a `context.Context` and returns a value of the specific type.
+
+Additionally each method can take an arbitrary number of options for adding metadata to the flag.
+
+For example:
 
 ```go
-var newUIFlag = feature.New("new-ui", feature.WithDescription("enables the new UI"))
-```
+package main
 
-The status of the flag can be checked via the [Enabled](https://pkg.go.dev/github.com/nussjustin/feature#Flag.Enabled)
-method which returns either `true` or `false`.
+import (
+	"context"
 
-```go
-var tmpl *template.Template
+	"github.com/nussjustin/feature"
+)
 
-if newUIFlag.Enabled(ctx) {
-    tmpl = template.Must(template.Parse("new-ui/*.gotmpl")))
-} else {
-    tmpl = template.Must(template.Parse("old-ui/*.gotmpl")))
+func main() {
+	var set feature.FlagSet
+
+	myFeature := set.Bool("my-feature", flag.WithDescription("enables the new feature"))
+
+	if myFeature(context.Background()) {
+		println("my-feature enabled") // never runs, see next section
+	}
 }
+
+
 ```
 
-In order for this to work a `Strategy` must be configured first. Otherwise `Enabled` will panic.
+### Configuring a registry
 
-### Configuring a strategy
+By default, the values returned for each flag will be the zero value for the specific type.
 
-In order to use feature flags a [Strategy](https://pkg.go.dev/github.com/nussjustin/feature#Strategy) must be created 
-and associated with the `Set` using `Set.SetStrategy` or, if using the global set, the global `SetStrategy` function.
+A [Registry][5] can be used to dynamically generate / fetch values for each flag.
+
+The package currently ships with a single implementation [SimpleStrategy][6]. External implementations are currently
+not supported.
+
+Once created, a registry can used by calling the [FlagSet.SetRegistry][7] method.
 
 Example:
 
 ```go
+package main
+
+import (
+	"context"
+
+	"github.com/nussjustin/feature"
+)
+
 func main() {
-    feature.SetStrategy(myCustomStrategy)
+	var set feature.FlagSet
+
+	set.SetStrategy(&feature.SimpleStrategy{
+		BoolFunc: func(ctx context.Context, name string) bool {
+			return name == "my-feature"
+		},
+	})
+
+	myFeature := set.Bool("my-feature", flag.WithDescription("enables the new feature"))
+
+	if myFeature(context.Background()) {
+		println("my-feature enabled")
+	}
 }
-```
 
-Or when using a custom `Set`:
-
-```go
-func main() {
-    mySet.SetStrategy(myCustomStrategy)
-}
-```
-
-### Using `Switch` to switch between code paths
-
-A common use case for flags is switching between code paths, for example using a `if`/`else` combination.
-
-The global [Switch](https://pkg.go.dev/github.com/nussjustin/feature#Switch) function provides an abstraction for this.
-
-When using the provided `Switch` function both the decision making and the results of the call can be traced using the
-builtin tracing functionality.
-
-To use `Switch` first define a flag:
-
-```go
-var newUIFlag = feature.New("new-ui", feature.WithDescription("enables the new UI"))
-```
-
-Later in your code, just call `Switch` and pass the flag together with 2 callbacks, one for when the flag is enabled and
-one for when it is not.
-
-```go
-tmpl, err := feature.Switch(ctx, newUIFlag, 
-	func(context.Context) (*template.Template, error) { return template.Parse("new-ui/*.gotmpl") },
-	func(context.Context) (*template.Template, error) { return template.Parse("old-ui/*.gotmpl") })
-```
-
-### Using different sets of flags
-
-All flags and cases created via `New` belong to a single global set of flags.
-
-In some cases applications may want to have multiple sets, for example when extracting a piece of code into its own
-package and importing packages not wanting to clobber the global flag set with the imported, by not necessarily used
-flags.
-
-For this and similar scenarios it is possible to create a custom
-[Set](https://pkg.go.dev/github.com/nussjustin/feature#Set) which acts as its own separate namespace of flags.
-
-When using a custom `Set` instead of using the `New` function, the `Set.New` method must be used.
-
-Example:
-
-```go
-var mySet feature.Set // zero value is valid
-
-var optimizationFlag = mySet.New("new-ui", feature.WithDescription("enables the new UI"))
-```
-
-### Changing strategies at runtime
-
-The `Strategy` can be changed at any time during runtime. This can be useful for applications that keep cached states
-of all states in memory and periodically receive new states.
-
-For cases like this the [DecisionMap](https://pkg.go.dev/github.com/nussjustin/feature#DecisionMap) type can be useful,
-which returns a static boolean for each flag based on its name.
-
-Example:
-
-```go
-func main() {
-	feature.SetStrategy(loadFlags())
-	
-	go func() {
-		// Update flags every minute
-		for range time.Ticker(time.Minute) {
-			feature.SetStrategy(loadFlags())
-		}
-	}()
-}
-```
-
-## Tracing
-
-It is possible to trace the use of `Flag`s using the [Tracer](https://pkg.go.dev/github.com/nussjustin/feature#Tracer)
-type.
-
-In order to trace the use of this package simply use the global
-[SetStrategy](https://pkg.go.dev/github.com/nussjustin/feature#SetStrategy) function to register a `Tracer`:
-
-```go
-func main() {
-    feature.SetTracer(myTracer)
-}
-```
-
-Or when using a custom `Set`:
-
-```go
-func main() {
-    mySet.SetTracer(myCustomStrategy)
-}
-```
-
-### OpenTelemetry integration
-
-The `otelfeature` package exposes a function that returns pre-configured `Tracer` that implements basic metrics and
-tracing for `Flag`s as well as the global `Switch` function using [OpenTelemetry](https://opentelemetry.io/).
-
-In order to enable metrics collection and tracing use the global
-[otelfeature.Tracer](https://pkg.go.dev/github.com/nussjustin/feature/otelfeature#Tracer) function to create a new
-`feature.Tracer` that can be passed to either the global `SetTracer` function or the `Set.SetStrategy` method.
-
-```go
-func main() {
-    tracer, err := otelfeature.Tracer(nil)
-    if err != nil {
-        // Handle the error
-    }
-    feature.SetTracer(tracer)
-}
 ```
 
 ## Contributing
@@ -168,3 +92,12 @@ Please make sure to update tests as appropriate.
 
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
+
+[0]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet
+[1]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Bool
+[2]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Float
+[3]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Int
+[4]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.String
+[5]: https://pkg.go.dev/github.com/nussjustin/feature/#Registry
+[6]: https://pkg.go.dev/github.com/nussjustin/feature/#SimpleStrategy
+[7]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.SetRegistry

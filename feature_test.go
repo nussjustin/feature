@@ -2,444 +2,388 @@ package feature_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"github.com/nussjustin/feature"
-	"html/template"
-	"log"
-	"maps"
-	"net/http"
-	"os"
-	"os/signal"
-	"reflect"
-	"strings"
-	"syscall"
 	"testing"
+
+	"github.com/nussjustin/feature"
+
+	"github.com/google/go-cmp/cmp"
 )
 
-func ExampleIf() {
-	testerStrategy = feature.StrategyFunc(func(ctx context.Context, _ string) bool {
-		// Enable all flags for testers
-		return IsTester(ctx)
-	})
-
-	feature.SetStrategy(testerStrategy)
+var testRegistry = &feature.SimpleRegistry{
+	BoolFunc: func(context.Context, string) bool {
+		return true
+	},
+	FloatFunc: func(context.Context, string) float64 {
+		return 2.5
+	},
+	IntFunc: func(context.Context, string) int {
+		return 1
+	},
+	StringFunc: func(context.Context, string) string {
+		return "string"
+	},
 }
 
-func TestDecision_Enabled(t *testing.T) {
-	assertDecision(t, feature.FixedStrategy(false), "test", false)
-	assertDecision(t, feature.FixedStrategy(true), "test", true)
+func TestFlagSet_All(t *testing.T) {
+	var set feature.FlagSet
+
+	set.Int("int",
+		feature.WithDescription("int value"),
+		feature.WithLabel("type", "int"))
+
+	set.Bool("bool",
+		feature.WithDescription("bool value"),
+		feature.WithLabel("type", "bool"))
+
+	set.String("string",
+		feature.WithDescription("string value"),
+		feature.WithLabel("type", "string"))
+
+	want := make([]feature.Flag, 3)
+	want[0], _ = set.Lookup("bool")
+	want[1], _ = set.Lookup("int")
+	want[2], _ = set.Lookup("string")
+
+	assertEquals(t, want, slicesCollect(set.All), "")
 }
 
-func ExampleSetStrategy() {
-	// Read initial configuration from local file
-	flags := readFlags("flags.json")
+func TestFlagSet_Lookup(t *testing.T) {
+	var set feature.FlagSet
 
-	feature.SetStrategy(feature.DecisionMap(flags))
+	set.Bool("flagA")
+	set.Bool("flagB", feature.WithDescription("description"))
 
-	go func() {
-		// Reload flags on SIGUSR1
-		signals := make(chan os.Signal, 1)
-		signal.Notify(signals, syscall.SIGUSR1)
+	flagA, okA := set.Lookup("flagA")
+	assertEquals(t, "flagA", flagA.Name, "flagA name mismatch")
+	assertEquals(t, "", flagA.Description, "flagA description mismatch")
+	assertEquals(t, true, okA, "flagA not marked as ok")
 
-		for range signals {
-			flags := readFlags("flags.json")
+	flagB, okB := set.Lookup("flagB")
+	assertEquals(t, "flagB", flagB.Name, "flagB name mismatch")
+	assertEquals(t, "description", flagB.Description, "flagB name mismatch")
+	assertEquals(t, true, okB, "flagB not marked as ok")
 
-			feature.SetStrategy(feature.DecisionMap(flags))
-		}
-	}()
-
-	// Main logic...
+	flagC, okC := set.Lookup("flagC")
+	assertEquals(t, "", flagC.Name, "flagC name mismatch")
+	assertEquals(t, "", flagC.Description, "flagC name mismatch")
+	assertEquals(t, false, okC, "flagC marked as ok")
 }
 
-func TestSetFlags(t *testing.T) {
-	if got, want := len(feature.Flags()), 0; got != want {
-		t.Errorf("got %d flags, want %d", got, want)
-	}
+func TestFlagSet_Bool(t *testing.T) {
+	t.Run("Duplicate", func(t *testing.T) {
+		var set feature.FlagSet
+		set.String("test")
 
-	f1 := feature.New("TestSetFlags/f1")
-	f3 := feature.New("TestSetFlags/f3")
-	f2 := feature.New("TestSetFlags/f2")
-
-	fs := feature.Flags()
-
-	if got, want := len(fs), 3; got != want {
-		t.Errorf("got %d flags, want %d", got, want)
-	}
-
-	if fs[0] != f1 {
-		t.Errorf("got flag %s at index %d, want %s", fs[0].Name(), 0, f1.Name())
-	}
-
-	if fs[1] != f2 {
-		t.Errorf("got flag %s at index %d, want %s", fs[1].Name(), 0, f2.Name())
-	}
-
-	if fs[2] != f3 {
-		t.Errorf("got flag %s at index %d, want %s", fs[2].Name(), 0, f3.Name())
-	}
-}
-
-func TestSetStrategy(t *testing.T) {
-	trim := func(s string) string {
-		return strings.TrimPrefix(s, "TestSetStrategy/")
-	}
-
-	lower := feature.StrategyFunc(func(_ context.Context, name string) bool {
-		return strings.ToLower(trim(name)) == trim(name)
-	})
-
-	upper := feature.StrategyFunc(func(_ context.Context, name string) bool {
-		return strings.ToUpper(trim(name)) == trim(name)
-	})
-
-	lowerFlag := feature.New("TestSetStrategy/lower")
-	mixedFlag := feature.New("TestSetStrategy/Mixed")
-	upperFlag := feature.New("TestSetStrategy/UPPER")
-
-	// Set first strategy
-	feature.SetStrategy(lower)
-
-	assertEnabled(t, lowerFlag)
-	assertDisabled(t, mixedFlag)
-	assertDisabled(t, upperFlag)
-
-	// Test changing from already set strategy
-	feature.SetStrategy(upper)
-
-	assertDisabled(t, lowerFlag)
-	assertDisabled(t, mixedFlag)
-	assertEnabled(t, upperFlag)
-}
-
-func TestSetTracer(t *testing.T) {
-	var decisionCount, runCount int
-
-	feature.SetTracer(feature.Tracer{
-		Decision: func(context.Context, *feature.Flag, bool) {
-			decisionCount++
-		},
-		Switch: func(context.Context, *feature.Flag, bool) (context.Context, func(any, error)) {
-			runCount++
-			return context.Background(), func(any, error) {}
-		},
-	})
-
-	f := feature.New("TestSetTracerProvider")
-
-	_, _ = feature.Switch(context.Background(), f,
-		func(context.Context) (int, error) { return 2, nil },
-		func(context.Context) (int, error) { return 1, nil })
-
-	if got, want := decisionCount, 1; got != want {
-		t.Errorf("got %d calls to Decision, want %d", got, want)
-	}
-
-	if got, want := runCount, 1; got != want {
-		t.Errorf("got %d calls to Switch, want %d", got, want)
-	}
-}
-
-func ExampleSwitch() {
-	optimizationFlag := feature.New("optimize-posts-loading",
-		feature.WithDescription("enables new query for loading posts"))
-
-	// later
-
-	post, err := feature.Switch(myCtx, optimizationFlag,
-		func(ctx context.Context) (Post, error) { return loadPostOptimized(ctx, postId) },
-		func(ctx context.Context) (Post, error) { return loadPost(ctx, postId) })
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(post)
-}
-
-func TestCase_Switch(t *testing.T) {
-	type result struct {
-		N     int
-		Error error
-	}
-
-	testCases := []struct {
-		Name     string
-		Decision bool
-		Old      result
-		New      result
-		Expected result
-	}{
-		{
-			Name:     "Old by default",
-			Old:      result{N: 1},
-			Expected: result{N: 1},
-		},
-		{
-			Name:     "Old",
-			Decision: false,
-			Old:      result{N: 1},
-			Expected: result{N: 1},
-		},
-		{
-			Name:     "Old error",
-			Decision: false,
-			Old:      result{Error: errors.New("test")},
-			Expected: result{Error: errors.New("test")},
-		},
-		{
-			Name:     "New",
-			Decision: true,
-			New:      result{N: 2},
-			Expected: result{N: 2},
-		},
-		{
-			Name:     "New error",
-			Decision: true,
-			New:      result{Error: errors.New("test")},
-			Expected: result{Error: errors.New("test")},
-		},
-	}
-
-	for i := range testCases {
-		testCase := testCases[i]
-
-		t.Run(testCase.Name, func(t *testing.T) {
-			var set feature.Set
-
-			set.SetStrategy(feature.FixedStrategy(testCase.Decision))
-
-			ctx := context.Background()
-
-			f := set.New("switch")
-
-			n, err := feature.Switch(ctx, f,
-				func(ctx context.Context) (int, error) { return testCase.New.N, testCase.New.Error },
-				func(ctx context.Context) (int, error) { return testCase.Old.N, testCase.Old.Error })
-			if !reflect.DeepEqual(err, testCase.Expected.Error) {
-				t.Errorf("got error %v, want %v", err, testCase.Expected.Error)
-			}
-			if n != testCase.Expected.N {
-				t.Errorf("got n = %d, want %d", n, testCase.Expected.N)
-			}
-		})
-	}
-}
-
-func ExampleFlag() {
-	// Register flag. Most of the time this will be done globally.
-	newUiFlag := feature.New("new-ui", feature.WithDescription("enables the new web ui"))
-
-	// Load old and new UI templates
-	oldUI := template.Must(template.ParseGlob("templates/old/*.gotmpl"))
-	newUI := template.Must(template.ParseGlob("templates/new/*.gotmpl"))
-
-	http.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
-		// Choose UI based on flag.
-		if newUiFlag.Enabled(r.Context()) {
-			_ = newUI.Execute(w, nil)
-		} else {
-			_ = oldUI.Execute(w, nil)
-		}
-	})
-
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-func TestNewFlag(t *testing.T) {
-	t.Run("FailsOnDuplicate", func(t *testing.T) {
-		feature.New("TestNewFlag/FailsOnDuplicate")
-
-		assertPanic(t, func() {
-			feature.New("TestNewFlag/FailsOnDuplicate")
+		assertPanic(t, feature.ErrDuplicateFlag, func() {
+			set.Bool("test")
 		})
 	})
 
-	t.Run("FailsEmptyName", func(t *testing.T) {
-		assertPanic(t, func() {
-			feature.New("")
+	t.Run("Register", func(t *testing.T) {
+		ctx := context.Background()
+
+		var set feature.FlagSet
+		v := set.Bool("test")
+		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) bool)
+
+		assertEquals(t, false, v(ctx), "")
+		assertEquals(t, false, v2(ctx), "")
+
+		set.SetRegistry(&feature.SimpleRegistry{BoolFunc: func(context.Context, string) bool {
+			return true
+		}})
+
+		assertEquals(t, true, v(ctx), "")
+		assertEquals(t, true, v2(ctx), "")
+
+		set.SetRegistry(&feature.SimpleRegistry{BoolFunc: func(context.Context, string) bool {
+			return false
+		}})
+
+		assertEquals(t, false, v(ctx), "")
+		assertEquals(t, false, v2(ctx), "")
+	})
+}
+
+func TestFlagSet_Float(t *testing.T) {
+	t.Run("Duplicate", func(t *testing.T) {
+		var set feature.FlagSet
+		set.Bool("test")
+
+		assertPanic(t, feature.ErrDuplicateFlag, func() {
+			set.Float("test")
 		})
 	})
 
-	t.Run("HasMetadata", func(t *testing.T) {
-		wantedLabels := map[string]any{"labelA": 1, "labelB": "2"}
+	t.Run("Register", func(t *testing.T) {
+		ctx := context.Background()
 
-		labels := maps.Clone(wantedLabels)
+		var set feature.FlagSet
+		v := set.Float("test")
+		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) float64)
 
-		f := feature.New("TestNewFlag/HasMetadata",
-			feature.WithDescription("some description"),
-			feature.WithLabels(labels))
+		assertEquals(t, 0.0, v(ctx), "")
+		assertEquals(t, 0.0, v2(ctx), "")
 
-		if got, want := f.Name(), "TestNewFlag/HasMetadata"; got != want {
-			t.Errorf("got f.Name() = %q, want %q", got, want)
-		}
+		set.SetRegistry(&feature.SimpleRegistry{FloatFunc: func(context.Context, string) float64 {
+			return 1.0
+		}})
 
-		if got, want := f.Description(), "some description"; got != want {
-			t.Errorf("got f.Config() = %q, want %q", got, want)
-		}
+		assertEquals(t, 1.0, v(ctx), "")
+		assertEquals(t, 1.0, v2(ctx), "")
 
-		labels["labelA"] = 2
+		set.SetRegistry(&feature.SimpleRegistry{FloatFunc: func(context.Context, string) float64 {
+			return 2.0
+		}})
 
-		labels = f.Labels()
-		labels["labelA"] = 3
-
-		if got, want := f.Labels(), wantedLabels; !maps.Equal(got, want) {
-			t.Errorf("got f.Config() = %#v, want %#v", got, want)
-		}
+		assertEquals(t, 2.0, v(ctx), "")
+		assertEquals(t, 2.0, v2(ctx), "")
 	})
 }
 
-func TestRegisterFlag(t *testing.T) {
-	t.Run("FailsOnCaseWithSameName", func(t *testing.T) {
-		var set feature.Set
-		set.New("FailsOnCaseWithSameName")
+func TestFlagSet_Int(t *testing.T) {
+	t.Run("Duplicate", func(t *testing.T) {
+		var set feature.FlagSet
+		set.Float("test")
 
-		assertPanic(t, func() {
-			set.New("FailsOnCaseWithSameName")
+		assertPanic(t, feature.ErrDuplicateFlag, func() {
+			set.Int("test")
 		})
 	})
 
-	t.Run("FailsOnDuplicate", func(t *testing.T) {
-		var set feature.Set
-		set.New("FailsOnDuplicate")
+	t.Run("Register", func(t *testing.T) {
+		ctx := context.Background()
 
-		assertPanic(t, func() {
-			set.New("FailsOnDuplicate")
+		var set feature.FlagSet
+		v := set.Int("test")
+		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) int)
+
+		assertEquals(t, 0, v(ctx), "")
+		assertEquals(t, 0, v2(ctx), "")
+
+		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int {
+			return 1
+		}})
+
+		assertEquals(t, 1, v(ctx), "")
+		assertEquals(t, 1, v2(ctx), "")
+
+		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int {
+			return 2
+		}})
+
+		assertEquals(t, 2, v(ctx), "")
+		assertEquals(t, 2, v2(ctx), "")
+	})
+}
+
+func TestFlagSet_String(t *testing.T) {
+	t.Run("Duplicate", func(t *testing.T) {
+		var set feature.FlagSet
+		set.Int("test")
+
+		assertPanic(t, feature.ErrDuplicateFlag, func() {
+			set.String("test")
 		})
 	})
-}
 
-func TestFlag_Labels(t *testing.T) {
-	var set feature.Set
+	t.Run("Register", func(t *testing.T) {
+		ctx := context.Background()
 
-	f := set.New(t.Name(), feature.WithLabels(map[string]any{"a": "b"}))
+		var set feature.FlagSet
+		v := set.String("test")
+		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) string)
 
-	if !maps.Equal(map[string]any{"a": "b"}, f.Labels()) {
-		t.Error("flag labels do not match configured labels")
-	}
+		assertEquals(t, "", v(ctx), "")
+		assertEquals(t, "", v2(ctx), "")
 
-	m := f.Labels()
-	delete(m, "a")
-	m["c"] = "d"
+		set.SetRegistry(&feature.SimpleRegistry{StringFunc: func(context.Context, string) string {
+			return "one"
+		}})
 
-	if !maps.Equal(map[string]any{"a": "b"}, f.Labels()) {
-		t.Error("flag labels were modified")
-	}
-}
+		assertEquals(t, "one", v(ctx), "")
+		assertEquals(t, "one", v2(ctx), "")
 
-func TestFlag_Enabled(t *testing.T) {
-	t.Run("NoStrategy", func(t *testing.T) {
-		var set feature.Set
+		set.SetRegistry(&feature.SimpleRegistry{StringFunc: func(context.Context, string) string {
+			return "two"
+		}})
 
-		assertPanic(t, func() {
-			assertDisabled(t, set.New("disabled"))
-		})
-	})
-
-	t.Run("StrategyOnSet", func(t *testing.T) {
-		var set feature.Set
-		set.SetStrategy(feature.DecisionMap{
-			"enabled":  true,
-			"disabled": false,
-		})
-		assertDisabled(t, set.New("disabled"))
-		assertEnabled(t, set.New("enabled"))
+		assertEquals(t, "two", v(ctx), "")
+		assertEquals(t, "two", v2(ctx), "")
 	})
 }
 
-func TestFixedStrategy(t *testing.T) {
-	assertDecision(t, feature.FixedStrategy(false), "test", false)
-	assertDecision(t, feature.FixedStrategy(true), "test", true)
-}
+func TestLabels(t *testing.T) {
+	var s feature.FlagSet
 
-func TestStrategyFunc_Enabled(t *testing.T) {
-	s := feature.StrategyFunc(func(_ context.Context, name string) bool {
-		return name == "Rob"
+	s.Bool("test",
+		feature.WithLabel("labelC", "C"),
+		feature.WithLabel("labelB", "B"),
+		feature.WithLabel("labelE", "E"),
+		feature.WithLabels(map[string]string{
+			"labelA": "A",
+			"labelE": "E2",
+			"labelF": "F",
+			"labelD": "D",
+		}))
+
+	f := mustLookup(t, &s, "test")
+
+	keys := make([]string, 0, f.Labels.Len())
+	labels := make(map[string]string, f.Labels.Len())
+
+	f.Labels.All(func(key string, value string) bool {
+		keys = append(keys, key)
+		labels[key] = value
+		return true
 	})
 
-	assertDecision(t, s, "Brad", false)
-	assertDecision(t, s, "Rob", true)
+	assertEquals(t, 6, len(keys), "unexpected number of labels")
+	assertEquals(t, []string{"labelA", "labelB", "labelC", "labelD", "labelE", "labelF"}, keys, "labels not sorted")
+	assertEquals(t, map[string]string{
+		"labelA": "A",
+		"labelB": "B",
+		"labelC": "C",
+		"labelD": "D",
+		"labelE": "E2",
+		"labelF": "F",
+	}, labels, "labels do not match")
+	assertEquals(t, 6, f.Labels.Len(), "wrong number of labels reported")
 }
 
-func ExampleDecisionMap() {
-	staticFlagsJSON, err := os.ReadFile("flags.json")
-	if err != nil {
-		log.Fatalf("failed to read flags JSON: %s", err)
-	}
+var globalBool bool
 
-	var staticFlags map[string]bool
-	if err := json.Unmarshal(staticFlagsJSON, &staticFlags); err != nil {
-		log.Fatalf("failed to parse flags JSON: %s", err)
-	}
+func BenchmarkFlagSet_Bool(b *testing.B) {
+	ctx := context.Background()
 
-	strategy := make(feature.DecisionMap, len(staticFlags))
-	for name, enabled := range staticFlags {
-		strategy[name] = enabled
-	}
+	var set feature.FlagSet
+	set.SetRegistry(testRegistry)
 
-	feature.SetStrategy(strategy)
+	f := set.Bool("test")
+	b.ReportAllocs()
+
+	for range b.N {
+		globalBool = f(ctx)
+	}
 }
 
-func TestDecisionMap_Enabled(t *testing.T) {
-	s := feature.DecisionMap{
-		"Brad": false,
-		"Rob":  true,
+var globalFloat float64
+
+func BenchmarkFlagSet_Float(b *testing.B) {
+	ctx := context.Background()
+
+	var set feature.FlagSet
+	set.SetRegistry(testRegistry)
+
+	f := set.Float("test")
+	b.ReportAllocs()
+
+	for range b.N {
+		globalFloat = f(ctx)
 	}
-
-	assertDecision(t, s, "Brad", false)
-	assertDecision(t, s, "Rob", true)
-
-	assertPanic(t, func() {
-		assertDecision(t, s, "Disabled", false)
-	})
 }
 
-func assertEnabled(tb testing.TB, f *feature.Flag) {
+var globalInt int
+
+func BenchmarkFlagSet_Int(b *testing.B) {
+	ctx := context.Background()
+
+	var set feature.FlagSet
+	set.SetRegistry(testRegistry)
+
+	f := set.Int("test")
+	b.ReportAllocs()
+
+	for range b.N {
+		globalInt = f(ctx)
+	}
+}
+
+var globalString string
+
+func BenchmarkFlagSet_String(b *testing.B) {
+	ctx := context.Background()
+
+	var set feature.FlagSet
+	set.SetRegistry(testRegistry)
+
+	f := set.String("test")
+	b.ReportAllocs()
+
+	for range b.N {
+		globalString = f(ctx)
+	}
+}
+
+func assertEquals[T any](tb testing.TB, want, got T, msg string) {
 	tb.Helper()
 
-	if !f.Enabled(context.Background()) {
-		tb.Errorf("flag %q is not enabled", f.Name())
+	if msg == "" {
+		msg = "result mismatch"
+	}
+
+	labelsComparer := cmp.Comparer(func(x, y feature.Labels) bool {
+		return cmp.Equal(mapsCollect(x.All), mapsCollect(y.All))
+	})
+
+	flagComparer := cmp.Comparer(func(x, y feature.Flag) bool {
+		return x.Name == y.Name && x.Description == y.Description && cmp.Equal(x.Labels, y.Labels, labelsComparer)
+	})
+
+	if diff := cmp.Diff(want, got, flagComparer, labelsComparer); diff != "" {
+		tb.Errorf("%s (-want +got):\n%s", msg, diff)
 	}
 }
 
-func assertDisabled(tb testing.TB, f *feature.Flag) {
-	tb.Helper()
-
-	if f.Enabled(context.Background()) {
-		tb.Errorf("flag %q is enabled", f.Name())
-	}
-}
-
-func assertDecision(tb testing.TB, s feature.Strategy, name string, want bool) {
-	tb.Helper()
-
-	if got := s.Enabled(context.Background(), name); got != want {
-		tb.Errorf("got %t, want %T", got, want)
-	}
-}
-
-func assertError(tb testing.TB, want, got error) {
-	tb.Helper()
-
-	switch {
-	case want == nil && got == nil:
-	case want == nil && got != nil:
-		tb.Errorf("got error %q, want no error", got)
-	case want != nil && got == nil:
-		tb.Errorf("got no error, want %s", want)
-	case !errors.Is(want, got) && !errors.Is(got, want):
-		tb.Errorf("got error %q, want %q", got, want)
-	}
-}
-
-func assertPanic(tb testing.TB, f func()) {
-	tb.Helper()
-
+func assertPanic(tb testing.TB, want error, f func()) {
 	defer func() {
-		if v := recover(); v == nil {
-			tb.Error("no panic was caught, expected a panic to be raised")
+		got := recover()
+		if got == nil {
+			tb.Errorf("expected panic with error %q, call did not panic", want)
+		}
+		gotErr, ok := got.(error)
+		if !ok {
+			tb.Fatalf("recovered value is not an error: %#v", got)
+		}
+		if !errors.Is(gotErr, want) {
+			tb.Errorf("expected error %q, got %q", want, gotErr)
 		}
 	}()
 
 	f()
+}
+
+func mustLookup(tb testing.TB, set *feature.FlagSet, name string) feature.Flag {
+	tb.Helper()
+
+	f, ok := set.Lookup(name)
+	if !ok {
+		tb.Fatalf("flag %q not found", name)
+	}
+
+	return f
+}
+
+type iterSeq[V any] func(yield func(V) bool)
+type iterSeq2[K, V any] func(yield func(K, V) bool)
+
+func mapsCollect[K comparable, V any](seq iterSeq2[K, V]) map[K]V {
+	m := make(map[K]V)
+
+	seq(func(k K, v V) bool {
+		m[k] = v
+		return true
+	})
+
+	return m
+}
+
+func slicesCollect[E any](seq iterSeq[E]) []E {
+	var s []E
+	seq(func(e E) bool {
+		s = append(s, e)
+		return true
+	})
+	return s
 }

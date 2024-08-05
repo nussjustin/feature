@@ -2,293 +2,258 @@ package feature
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"maps"
-	"sort"
 	"sync"
 	"sync/atomic"
 )
 
-// DecisionMap implements a simple [Strategy] that returns a fixed value for each flag by its name.
+// ErrDuplicateFlag is returned by [Register] if a with the given name is already registered.
+var ErrDuplicateFlag = errors.New("duplicate flag")
+
+// Flag represents a flag registered with a [FlagSet].
+type Flag struct {
+	// Name is the name of the feature as passed to [Register].
+	Name string
+
+	// Description is an optional description specified using [WithDescription].
+	Description string
+
+	// Labels contains the labels specified via [WithLabels].
+	Labels Labels
+
+	// Func is callback that returns the value for the flag and is either a [BoolFunc], [IntFunc] or [StringFunc].
+	Func any
+}
+
+// FlagSet represents a set of defined feature flags.
 //
-// Checking a flag that is not in the map will panic.
-type DecisionMap map[string]bool
+// The zero value is valid and returns zero values for all flags.
+type FlagSet struct {
+	registry atomic.Pointer[Registry]
 
-var _ Strategy = (DecisionMap)(nil)
-
-// Enabled implements the [Strategy] interface.
-//
-// If a feature with the given name is not found, Enabled will panic.
-func (m DecisionMap) Enabled(_ context.Context, name string) bool {
-	if d, ok := m[name]; ok {
-		return d
-	}
-	panic(fmt.Sprintf("strategy for feature %q not configured", name))
+	flagsMu sync.Mutex
+	flags   sortedMap[Flag]
 }
 
-// Set manages feature flags and provides a [Strategy] (using [SetStrategy]) for making dynamic decisions about
-// a flags' status.
-//
-// A Set with no associated [Strategy] is invalid and checking a flag will panic.
-type Set struct {
-	strategy atomic.Pointer[Strategy]
-	tracer   atomic.Pointer[Tracer]
-
-	mu    sync.Mutex
-	flags map[string]*Flag
+// Labels is a read only map collection of labels associated with a feature flag.
+type Labels struct {
+	m sortedMap[string]
 }
 
-var globalSet Set
-
-// New registers and returns a new [Flag] with the global [Set].
-//
-// See [Set.New] for more details.
-func New(name string, opts ...Option) *Flag {
-	return globalSet.New(name, opts...)
-}
-
-// New registers and returns a new [Flag] on s.
-//
-// If the given name is empty or already registered, New will panic.
-func (s *Set) New(name string, opts ...Option) *Flag {
-	if name == "" {
-		panic("missing name for flag")
-	}
-
-	return s.newFlag(name, opts)
-}
-
-// SetStrategy sets the [Strategy] for the global [Set].
-func SetStrategy(strategy Strategy) {
-	globalSet.SetStrategy(strategy)
-}
-
-// SetStrategy sets the [Strategy] used by s to make decisions.
-func (s *Set) SetStrategy(strategy Strategy) {
-	if s == nil {
-		panic("strategy must not be nil")
-	}
-
-	s.strategy.Store(&strategy)
-}
-
-// SetTracer sets the [Tracer] used for the global [Set].
-//
-// See [Tracer] for more information.
-func SetTracer(tracer Tracer) {
-	globalSet.SetTracer(tracer)
-}
-
-// SetTracer sets the [Tracer] used by the [Set].
-//
-// See [Tracer] for more information.
-func (s *Set) SetTracer(tracer Tracer) {
-	s.tracer.Store(&tracer)
-}
-
-func (s *Set) getTracer() Tracer {
-	if t := s.tracer.Load(); t != nil {
-		return *t
-	}
-	return Tracer{}
-}
-
-// Flags returns a slice containing all flags registered with the global [Set].
-//
-// See [Set.Flags] for more information.
-func Flags() []*Flag {
-	return globalSet.Flags()
-}
-
-// Flags returns a slice containing all registered flags order by name.
-func (s *Set) Flags() []*Flag {
-	s.mu.Lock()
-
-	fs := make([]*Flag, 0, len(s.flags))
-	for _, f := range s.flags {
-		fs = append(fs, f)
-	}
-
-	s.mu.Unlock()
-
-	sort.Slice(fs, func(i, j int) bool {
-		return fs[i].name < fs[j].name
-	})
-
-	return fs
-}
-
-func (s *Set) newFlag(name string, opts []Option) *Flag {
-	f := &Flag{
-		set:  s,
-		name: name,
-	}
-
-	for _, opt := range opts {
-		opt(f)
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.flags == nil {
-		s.flags = map[string]*Flag{}
-	}
-
-	if _, ok := s.flags[name]; ok {
-		panic(fmt.Sprintf("name %q already in use", name))
-	}
-
-	s.flags[name] = f
-
-	return f
-}
-
-// Tracer can be used to trace the use of calls to [Flag.Enabled] as well as the global helper function [Switch].
-//
-// See the documentation on each field for information on what can be traced.
-//
-// All fields are optional.
-//
-// A basic, pre-configured [Tracer] using OpenTelemetry can be found in the otelfeature subpackage.
-type Tracer struct {
-	// Decision is called every time [Flag.Enabled] is called.
-	Decision func(ctx context.Context, f *Flag, enabled bool)
-
-	// Switch is called at the beginning of every call to [Switch].
-	//
-	// The returned function is called with the result that will be returned.
-	//
-	// The returned function can be nil.
-	Switch func(ctx context.Context, f *Flag, enabled bool) (context.Context, func(result any, err error))
-}
-
-// Switch checks if the associated flag is enabled and runs either ifEnabled or ifDisabled and returns their result.
-func Switch[T any](ctx context.Context, flag *Flag,
-	ifEnabled func(context.Context) (T, error),
-	ifDisabled func(context.Context) (T, error),
-) (T, error) {
-	enabled := flag.Enabled(ctx)
-
-	var done func(any, error)
-	if t := flag.set.getTracer(); t.Switch != nil {
-		ctx, done = t.Switch(ctx, flag, enabled)
-	}
-
-	fn := ifDisabled
-	if enabled {
-		fn = ifEnabled
-	}
-
-	resultT, err := fn(ctx)
-
-	if done != nil {
-		done(resultT, err)
-	}
-
-	return resultT, err
-}
-
-type Option func(*Flag)
-
-// WithDescription sets the description for a new flag.
-func WithDescription(desc string) Option {
-	return func(f *Flag) {
-		f.description = desc
-	}
-}
-
-// WithLabels adds the given labels to a new flag.
-func WithLabels(l map[string]any) Option {
-	return func(f *Flag) {
-		if f.labels == nil {
-			f.labels = maps.Clone(l)
-		} else {
-			maps.Copy(f.labels, l)
+// All yields all labels.
+func (l *Labels) All(yield func(string, string) bool) {
+	for _, key := range l.m.keys {
+		if !yield(key, l.m.m[key]) {
+			return
 		}
 	}
 }
 
-// Flag represents a feature flag that can be enabled or disabled (toggled) dynamically at runtime and used to control
-// the behaviour of an application, for example by dynamically changing code paths (see [Switch]).
-//
-// A Flag must be obtained using either [New] or [Set.New].
-type Flag struct {
-	set *Set
-
-	name        string
-	description string
-	labels      map[string]any
+// Len returns the number of labels.
+func (l *Labels) Len() int {
+	return len(l.m.keys)
 }
 
-func (f *Flag) trace(ctx context.Context, enabled bool) {
-	if t := f.set.getTracer(); t.Decision != nil {
-		t.Decision(ctx, f, enabled)
+// All yields all registered flags sorted by name.
+func (s *FlagSet) All(yield func(Flag) bool) {
+	s.flagsMu.Lock()
+	flags := s.flags
+	s.flagsMu.Unlock()
+
+	for _, key := range flags.keys {
+		if !yield(flags.m[key]) {
+			return
+		}
 	}
 }
 
-// Enabled returns true if the feature is enabled for the given context.
+// Lookup returns the flag with the given name.
+func (s *FlagSet) Lookup(name string) (Flag, bool) {
+	s.flagsMu.Lock()
+	defer s.flagsMu.Unlock()
+
+	f, ok := s.flags.m[name]
+	return f, ok
+}
+
+// SetRegistry sets the Registry to be used for looking up flag values.
 //
-// Example:
-//
-//	if trackingFlag.Enabled(ctx) {
-//	   trackUser(ctx, user)
-//	}
-func (f *Flag) Enabled(ctx context.Context) bool {
-	s := f.set.strategy.Load()
-	if s == nil {
-		panic("no Strategy configured for set")
+// A nil value will cause all flags to return zero values.
+func (s *FlagSet) SetRegistry(r Registry) {
+	if r == nil {
+		s.registry.Store(nil)
+	} else {
+		s.registry.Store(&r)
 	}
-	enabled := (*s).Enabled(ctx, f.name)
-	f.trace(ctx, enabled)
-	return enabled
 }
 
-// Name returns the name of the feature flag.
-func (f *Flag) Name() string {
-	return f.name
+func (s *FlagSet) add(name string, fun any, opts ...Option) {
+	f := Flag{Name: name, Func: fun}
+	for _, opt := range opts {
+		opt(&f)
+	}
+
+	s.flagsMu.Lock()
+	defer s.flagsMu.Unlock()
+
+	if _, ok := s.flags.m[f.Name]; ok {
+		panic(fmt.Errorf("%w: %s", ErrDuplicateFlag, f.Name))
+	}
+
+	s.flags = s.flags.add(f.Name, f)
 }
 
-// Description returns the description of the defined feature.
-func (f *Flag) Description() string {
-	return f.description
-}
-
-// Labels returns a copy of the labels associated with this feature.
-func (f *Flag) Labels() map[string]any {
-	return maps.Clone(f.labels)
-}
-
-// Strategy defines an interface used for deciding on whether a feature is enabled or not.
+// Bool registers a new flag that represents a boolean value.
 //
-// A Strategy must be safe for concurrent use.
-type Strategy interface {
-	// Enabled takes the name of a feature flag and returns true if the feature is enabled or false otherwise.
-	Enabled(ctx context.Context, name string) bool
+// If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
+func (s *FlagSet) Bool(name string, opts ...Option) func(context.Context) bool {
+	f := func(ctx context.Context) bool {
+		r := s.registry.Load()
+		if r == nil {
+			return false
+		}
+		return (*r).Bool(ctx, name)
+	}
+
+	s.add(name, f, opts...)
+
+	return f
 }
 
-type fixedStrategy struct {
-	d bool
+// Float registers a new flag that represents a float value.
+//
+// If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
+func (s *FlagSet) Float(name string, opts ...Option) func(context.Context) float64 {
+	f := func(ctx context.Context) float64 {
+		r := s.registry.Load()
+		if r == nil {
+			return 0.0
+		}
+		return (*r).Float(ctx, name)
+	}
+
+	s.add(name, f, opts...)
+
+	return f
 }
 
-var _ Strategy = fixedStrategy{}
+// Int registers a new flag that represents an int value.
+//
+// If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
+func (s *FlagSet) Int(name string, opts ...Option) func(context.Context) int {
+	f := func(ctx context.Context) int {
+		r := s.registry.Load()
+		if r == nil {
+			return 0
+		}
+		return (*r).Int(ctx, name)
+	}
 
-// Enabled implements the Strategy interface.
-func (f fixedStrategy) Enabled(context.Context, string) bool {
-	return f.d
+	s.add(name, f, opts...)
+
+	return f
 }
 
-// FixedStrategy returns a [Strategy] that always returns the given boolean decision.
-func FixedStrategy(enabled bool) Strategy {
-	return fixedStrategy{enabled}
+// String registers a new flag that represents a string value.
+//
+// If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
+func (s *FlagSet) String(name string, opts ...Option) func(context.Context) string {
+	f := func(ctx context.Context) string {
+		r := s.registry.Load()
+		if r == nil {
+			return ""
+		}
+		return (*r).String(ctx, name)
+	}
+
+	s.add(name, f, opts...)
+
+	return f
 }
 
-// StrategyFunc implements a [Strategy] by calling itself.
-type StrategyFunc func(ctx context.Context, name string) bool
+// Option defines options for new flags which can be passed to [Register].
+type Option func(*Flag)
 
-var _ Strategy = (StrategyFunc)(nil)
-
-// Enabled implements the [Strategy] interface.
-func (f StrategyFunc) Enabled(ctx context.Context, name string) bool {
-	return f(ctx, name)
+// WithDescription sets the description for a flag.
+//
+// if given multiple times, only the last value is used.
+func WithDescription(desc string) Option {
+	return func(f *Flag) {
+		f.Description = desc
+	}
 }
+
+// WithLabel adds a label to a flag.
+func WithLabel(key, value string) Option {
+	return func(f *Flag) {
+		f.Labels.m = f.Labels.m.add(key, value)
+	}
+}
+
+// WithLabels adds labels to a flag.
+//
+// If used multiple times, the maps will be merged with later values replacing prior ones.
+func WithLabels(labels map[string]string) Option {
+	return func(f *Flag) {
+		f.Labels.m = f.Labels.m.addMany(labels)
+	}
+}
+
+// Registry defines method for getting the feature flag values by name.
+//
+// Calling a method when the corresponding struct field is not set will cause the call to panic.
+//
+// This interface can not be implemented by other packages other except by embedding an existing implementation.
+type Registry interface {
+	// Bool returns the boolean value for the flag with the given name.
+	Bool(ctx context.Context, name string) bool
+
+	// Float returns the float value for the flag with the given name.
+	Float(ctx context.Context, name string) float64
+
+	// Int returns the integer value for the flag with the given name.
+	Int(ctx context.Context, name string) int
+
+	// String returns the string value for the flag with the given name.
+	String(ctx context.Context, name string) string
+
+	registry()
+}
+
+// SimpleRegistry implements a [Registry] using callbacks set as struct fields.
+type SimpleRegistry struct {
+	// BoolFunc contains the implementation for the Registry.Bool function.
+	BoolFunc func(ctx context.Context, name string) bool
+
+	// FloatFunc contains the implementation for the Registry.Float function.
+	FloatFunc func(ctx context.Context, name string) float64
+
+	// IntFunc contains the implementation for the Registry.Int function.
+	IntFunc func(ctx context.Context, name string) int
+
+	// StringFunc contains the implementation for the Registry.String function.
+	StringFunc func(ctx context.Context, name string) string
+}
+
+// Bool implements the [Registry] interface by calling s.BoolFunc and returning the result.
+func (s *SimpleRegistry) Bool(ctx context.Context, name string) bool {
+	return s.BoolFunc(ctx, name)
+}
+
+// Float implements the [Registry] interface by calling s.FloatFunc and returning the result.
+func (s *SimpleRegistry) Float(ctx context.Context, name string) float64 {
+	return s.FloatFunc(ctx, name)
+}
+
+// Int implements the [Registry] interface by calling s.IntFunc and returning the result.
+func (s *SimpleRegistry) Int(ctx context.Context, name string) int {
+	return s.IntFunc(ctx, name)
+}
+
+// String implements the [Registry] interface by calling s.StringFunc and returning the result.
+func (s *SimpleRegistry) String(ctx context.Context, name string) string {
+	return s.StringFunc(ctx, name)
+}
+
+func (s *SimpleRegistry) registry() {}
