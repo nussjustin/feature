@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/nussjustin/feature"
-
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/nussjustin/feature"
 )
 
 var testRegistry = &feature.SimpleRegistry{
@@ -365,8 +365,10 @@ func mustLookup(tb testing.TB, set *feature.FlagSet, name string) feature.Flag {
 	return f
 }
 
-type iterSeq[V any] func(yield func(V) bool)
-type iterSeq2[K, V any] func(yield func(K, V) bool)
+type (
+	iterSeq[V any]     func(yield func(V) bool)
+	iterSeq2[K, V any] func(yield func(K, V) bool)
+)
 
 func mapsCollect[K comparable, V any](seq iterSeq2[K, V]) map[K]V {
 	m := make(map[K]V)
