@@ -51,8 +51,7 @@ By default, the values returned for each flag will be the zero value for the spe
 
 A [Registry][5] can be used to dynamically generate / fetch values for each flag.
 
-The package currently ships with a single implementation [SimpleStrategy][6]. External implementations are currently
-not supported.
+The package currently ships with a single implementation [SimpleStrategy][6].
 
 Once created, a registry can used by calling the [FlagSet.SetRegistry][7] method.
 

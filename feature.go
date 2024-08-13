@@ -203,8 +203,6 @@ func WithLabels(labels map[string]string) Option {
 // Registry defines method for getting the feature flag values by name.
 //
 // Calling a method when the corresponding struct field is not set will cause the call to panic.
-//
-// This interface can not be implemented by other packages other except by embedding an existing implementation.
 type Registry interface {
 	// Bool returns the boolean value for the flag with the given name.
 	Bool(ctx context.Context, name string) bool
@@ -217,8 +215,6 @@ type Registry interface {
 
 	// String returns the string value for the flag with the given name.
 	String(ctx context.Context, name string) string
-
-	registry()
 }
 
 // SimpleRegistry implements a [Registry] using callbacks set as struct fields.
@@ -255,5 +251,3 @@ func (s *SimpleRegistry) Int(ctx context.Context, name string) int {
 func (s *SimpleRegistry) String(ctx context.Context, name string) string {
 	return s.StringFunc(ctx, name)
 }
-
-func (s *SimpleRegistry) registry() {}
