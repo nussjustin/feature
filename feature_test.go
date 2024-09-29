@@ -23,6 +23,9 @@ var testRegistry = &feature.SimpleRegistry{
 	StringFunc: func(context.Context, string) string {
 		return "string"
 	},
+	UintFunc: func(context.Context, string) uint64 {
+		return 2
+	},
 }
 
 func TestFlagSet_All(t *testing.T) {
@@ -40,10 +43,20 @@ func TestFlagSet_All(t *testing.T) {
 		feature.WithDescription("string value"),
 		feature.WithLabel("type", "string"))
 
-	want := make([]feature.Flag, 3)
+	set.Float("float",
+		feature.WithDescription("float value"),
+		feature.WithLabel("type", "float"))
+
+	set.Uint("uint",
+		feature.WithDescription("uint value"),
+		feature.WithLabel("type", "uint"))
+
+	want := make([]feature.Flag, 5)
 	want[0], _ = set.Lookup("bool")
-	want[1], _ = set.Lookup("int")
-	want[2], _ = set.Lookup("string")
+	want[1], _ = set.Lookup("float")
+	want[2], _ = set.Lookup("int")
+	want[3], _ = set.Lookup("string")
+	want[4], _ = set.Lookup("uint")
 
 	assertEquals(t, want, slicesCollect(set.All), "")
 }
@@ -211,6 +224,42 @@ func TestFlagSet_String(t *testing.T) {
 
 		assertEquals(t, "two", v(ctx), "")
 		assertEquals(t, "two", v2(ctx), "")
+	})
+}
+
+func TestFlagSet_Uint(t *testing.T) {
+	t.Run("Duplicate", func(t *testing.T) {
+		var set feature.FlagSet
+		set.Float("test")
+
+		assertPanic(t, feature.ErrDuplicateFlag, func() {
+			set.Uint("test")
+		})
+	})
+
+	t.Run("Register", func(t *testing.T) {
+		ctx := context.Background()
+
+		var set feature.FlagSet
+		v := set.Uint("test")
+		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) uint64)
+
+		assertEquals(t, 0, v(ctx), "")
+		assertEquals(t, 0, v2(ctx), "")
+
+		set.SetRegistry(&feature.SimpleRegistry{UintFunc: func(context.Context, string) uint64 {
+			return 1
+		}})
+
+		assertEquals(t, 1, v(ctx), "")
+		assertEquals(t, 1, v2(ctx), "")
+
+		set.SetRegistry(&feature.SimpleRegistry{UintFunc: func(context.Context, string) uint64 {
+			return 2
+		}})
+
+		assertEquals(t, 2, v(ctx), "")
+		assertEquals(t, 2, v2(ctx), "")
 	})
 }
 

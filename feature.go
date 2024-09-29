@@ -172,6 +172,23 @@ func (s *FlagSet) String(name string, opts ...Option) func(context.Context) stri
 	return f
 }
 
+// Uint registers a new flag that represents an uint64 value.
+//
+// If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
+func (s *FlagSet) Uint(name string, opts ...Option) func(context.Context) uint64 {
+	f := func(ctx context.Context) uint64 {
+		r := s.registry.Load()
+		if r == nil {
+			return 0
+		}
+		return (*r).Uint(ctx, name)
+	}
+
+	s.add(name, f, opts...)
+
+	return f
+}
+
 // Option defines options for new flags which can be passed to [Register].
 type Option func(*Flag)
 
@@ -201,8 +218,6 @@ func WithLabels(labels map[string]string) Option {
 }
 
 // Registry defines method for getting the feature flag values by name.
-//
-// Calling a method when the corresponding struct field is not set will cause the call to panic.
 type Registry interface {
 	// Bool returns the boolean value for the flag with the given name.
 	Bool(ctx context.Context, name string) bool
@@ -215,9 +230,14 @@ type Registry interface {
 
 	// String returns the string value for the flag with the given name.
 	String(ctx context.Context, name string) string
+
+	// Uint returns the unsigned integer value for the flag with the given name.
+	Uint(ctx context.Context, name string) uint64
 }
 
 // SimpleRegistry implements a [Registry] using callbacks set as struct fields.
+//
+// Calling a method when the corresponding struct field is not set will cause the call to panic.
 type SimpleRegistry struct {
 	// BoolFunc contains the implementation for the Registry.Bool function.
 	BoolFunc func(ctx context.Context, name string) bool
@@ -230,6 +250,9 @@ type SimpleRegistry struct {
 
 	// StringFunc contains the implementation for the Registry.String function.
 	StringFunc func(ctx context.Context, name string) string
+
+	// UintFunc contains the implementation for the Registry.Uint function.
+	UintFunc func(ctx context.Context, name string) uint64
 }
 
 // Bool implements the [Registry] interface by calling s.BoolFunc and returning the result.
@@ -250,4 +273,9 @@ func (s *SimpleRegistry) Int(ctx context.Context, name string) int64 {
 // String implements the [Registry] interface by calling s.StringFunc and returning the result.
 func (s *SimpleRegistry) String(ctx context.Context, name string) string {
 	return s.StringFunc(ctx, name)
+}
+
+// Uint implements the [Registry] interface by calling s.UintFunc and returning the result.
+func (s *SimpleRegistry) Uint(ctx context.Context, name string) uint64 {
+	return s.UintFunc(ctx, name)
 }
