@@ -17,7 +17,7 @@ var testRegistry = &feature.SimpleRegistry{
 	FloatFunc: func(context.Context, string) float64 {
 		return 2.5
 	},
-	IntFunc: func(context.Context, string) int {
+	IntFunc: func(context.Context, string) int64 {
 		return 1
 	},
 	StringFunc: func(context.Context, string) string {
@@ -157,19 +157,19 @@ func TestFlagSet_Int(t *testing.T) {
 
 		var set feature.FlagSet
 		v := set.Int("test")
-		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) int)
+		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) int64)
 
 		assertEquals(t, 0, v(ctx), "")
 		assertEquals(t, 0, v2(ctx), "")
 
-		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int {
+		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int64 {
 			return 1
 		}})
 
 		assertEquals(t, 1, v(ctx), "")
 		assertEquals(t, 1, v2(ctx), "")
 
-		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int {
+		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int64 {
 			return 2
 		}})
 
@@ -284,7 +284,7 @@ func BenchmarkFlagSet_Float(b *testing.B) {
 	}
 }
 
-var globalInt int
+var globalInt int64
 
 func BenchmarkFlagSet_Int(b *testing.B) {
 	ctx := context.Background()

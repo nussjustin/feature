@@ -138,11 +138,11 @@ func (s *FlagSet) Float(name string, opts ...Option) func(context.Context) float
 	return f
 }
 
-// Int registers a new flag that represents an int value.
+// Int registers a new flag that represents an int64 value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Int(name string, opts ...Option) func(context.Context) int {
-	f := func(ctx context.Context) int {
+func (s *FlagSet) Int(name string, opts ...Option) func(context.Context) int64 {
+	f := func(ctx context.Context) int64 {
 		r := s.registry.Load()
 		if r == nil {
 			return 0
@@ -211,7 +211,7 @@ type Registry interface {
 	Float(ctx context.Context, name string) float64
 
 	// Int returns the integer value for the flag with the given name.
-	Int(ctx context.Context, name string) int
+	Int(ctx context.Context, name string) int64
 
 	// String returns the string value for the flag with the given name.
 	String(ctx context.Context, name string) string
@@ -226,7 +226,7 @@ type SimpleRegistry struct {
 	FloatFunc func(ctx context.Context, name string) float64
 
 	// IntFunc contains the implementation for the Registry.Int function.
-	IntFunc func(ctx context.Context, name string) int
+	IntFunc func(ctx context.Context, name string) int64
 
 	// StringFunc contains the implementation for the Registry.String function.
 	StringFunc func(ctx context.Context, name string) string
@@ -243,7 +243,7 @@ func (s *SimpleRegistry) Float(ctx context.Context, name string) float64 {
 }
 
 // Int implements the [Registry] interface by calling s.IntFunc and returning the result.
-func (s *SimpleRegistry) Int(ctx context.Context, name string) int {
+func (s *SimpleRegistry) Int(ctx context.Context, name string) int64 {
 	return s.IntFunc(ctx, name)
 }
 

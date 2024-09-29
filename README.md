@@ -19,7 +19,7 @@ Currently, the supported methods are
 
 Each method will return a callback that takes a `context.Context` and returns a value of the specific type.
 
-Additionally each method can take an arbitrary number of options for adding metadata to the flag.
+Additionally, each method can take an arbitrary number of options for adding metadata to the flag.
 
 For example:
 
