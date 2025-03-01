@@ -22,7 +22,7 @@ type Flag struct {
 	// Labels contains the labels specified via [WithLabels].
 	Labels Labels
 
-	// Func is callback that returns the value for the flag and is either a [BoolFunc], [IntFunc] or [StringFunc].
+	// Func is the function returned when the flag was registered.
 	Func any
 }
 
