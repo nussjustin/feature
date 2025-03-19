@@ -16,6 +16,7 @@ Currently, the supported methods are
 * [FlagSet.Float][2] for float flags,
 * [FlagSet.Int][3] for int flags and
 * [FlagSet.String][4] for string flags.
+* [FlagSet.Uint][8] for string flags.
 
 Each method will return a callback that takes a `context.Context` and returns a value of the specific type.
 
@@ -100,3 +101,4 @@ Please make sure to update tests as appropriate.
 [5]: https://pkg.go.dev/github.com/nussjustin/feature/#Registry
 [6]: https://pkg.go.dev/github.com/nussjustin/feature/#SimpleStrategy
 [7]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.SetRegistry
+[8]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Uint
