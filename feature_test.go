@@ -94,7 +94,7 @@ func TestFlagSet_Bool(t *testing.T) {
 	})
 
 	t.Run("Register", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 
 		var set feature.FlagSet
 		v := set.Bool("test")
@@ -130,7 +130,7 @@ func TestFlagSet_Float(t *testing.T) {
 	})
 
 	t.Run("Register", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 
 		var set feature.FlagSet
 		v := set.Float("test")
@@ -166,7 +166,7 @@ func TestFlagSet_Int(t *testing.T) {
 	})
 
 	t.Run("Register", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 
 		var set feature.FlagSet
 		v := set.Int("test")
@@ -202,7 +202,7 @@ func TestFlagSet_String(t *testing.T) {
 	})
 
 	t.Run("Register", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 
 		var set feature.FlagSet
 		v := set.String("test")
@@ -238,7 +238,7 @@ func TestFlagSet_Uint(t *testing.T) {
 	})
 
 	t.Run("Register", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 
 		var set feature.FlagSet
 		v := set.Uint("test")
@@ -304,7 +304,7 @@ func TestLabels(t *testing.T) {
 var globalBool bool
 
 func BenchmarkFlagSet_Bool(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 
 	var set feature.FlagSet
 	set.SetRegistry(testRegistry)
@@ -320,7 +320,7 @@ func BenchmarkFlagSet_Bool(b *testing.B) {
 var globalFloat float64
 
 func BenchmarkFlagSet_Float(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 
 	var set feature.FlagSet
 	set.SetRegistry(testRegistry)
@@ -336,7 +336,7 @@ func BenchmarkFlagSet_Float(b *testing.B) {
 var globalInt int64
 
 func BenchmarkFlagSet_Int(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 
 	var set feature.FlagSet
 	set.SetRegistry(testRegistry)
@@ -352,7 +352,7 @@ func BenchmarkFlagSet_Int(b *testing.B) {
 var globalString string
 
 func BenchmarkFlagSet_String(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 
 	var set feature.FlagSet
 	set.SetRegistry(testRegistry)
@@ -386,6 +386,8 @@ func assertEquals[T any](tb testing.TB, want, got T, msg string) {
 }
 
 func assertPanic(tb testing.TB, want error, f func()) {
+	tb.Helper()
+
 	defer func() {
 		got := recover()
 		if got == nil {
