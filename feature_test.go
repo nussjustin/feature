@@ -301,8 +301,6 @@ func TestLabels(t *testing.T) {
 	assertEquals(t, 6, f.Labels.Len(), "wrong number of labels reported")
 }
 
-var globalBool bool
-
 func BenchmarkFlagSet_Bool(b *testing.B) {
 	ctx := b.Context()
 
@@ -312,12 +310,10 @@ func BenchmarkFlagSet_Bool(b *testing.B) {
 	f := set.Bool("test")
 	b.ReportAllocs()
 
-	for range b.N {
-		globalBool = f(ctx)
+	for b.Loop() {
+		f(ctx)
 	}
 }
-
-var globalFloat float64
 
 func BenchmarkFlagSet_Float(b *testing.B) {
 	ctx := b.Context()
@@ -328,12 +324,10 @@ func BenchmarkFlagSet_Float(b *testing.B) {
 	f := set.Float("test")
 	b.ReportAllocs()
 
-	for range b.N {
-		globalFloat = f(ctx)
+	for b.Loop() {
+		f(ctx)
 	}
 }
-
-var globalInt int64
 
 func BenchmarkFlagSet_Int(b *testing.B) {
 	ctx := b.Context()
@@ -344,12 +338,10 @@ func BenchmarkFlagSet_Int(b *testing.B) {
 	f := set.Int("test")
 	b.ReportAllocs()
 
-	for range b.N {
-		globalInt = f(ctx)
+	for b.Loop() {
+		f(ctx)
 	}
 }
-
-var globalString string
 
 func BenchmarkFlagSet_String(b *testing.B) {
 	ctx := b.Context()
@@ -360,8 +352,22 @@ func BenchmarkFlagSet_String(b *testing.B) {
 	f := set.String("test")
 	b.ReportAllocs()
 
-	for range b.N {
-		globalString = f(ctx)
+	for b.Loop() {
+		f(ctx)
+	}
+}
+
+func BenchmarkFlagSet_Uint(b *testing.B) {
+	ctx := b.Context()
+
+	var set feature.FlagSet
+	set.SetRegistry(testRegistry)
+
+	f := set.Uint("test")
+	b.ReportAllocs()
+
+	for b.Loop() {
+		f(ctx)
 	}
 }
 
