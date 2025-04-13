@@ -31,23 +31,23 @@ var testRegistry = &feature.SimpleRegistry{
 func TestFlagSet_All(t *testing.T) {
 	var set feature.FlagSet
 
-	set.Int("int",
+	set.Int("int", 0,
 		feature.WithDescription("int value"),
 		feature.WithLabel("type", "int"))
 
-	set.Bool("bool",
+	set.Bool("bool", false,
 		feature.WithDescription("bool value"),
 		feature.WithLabel("type", "bool"))
 
-	set.String("string",
+	set.String("string", "",
 		feature.WithDescription("string value"),
 		feature.WithLabel("type", "string"))
 
-	set.Float("float",
+	set.Float("float", 0.0,
 		feature.WithDescription("float value"),
 		feature.WithLabel("type", "float"))
 
-	set.Uint("uint",
+	set.Uint("uint", 0,
 		feature.WithDescription("uint value"),
 		feature.WithLabel("type", "uint"))
 
@@ -64,21 +64,24 @@ func TestFlagSet_All(t *testing.T) {
 func TestFlagSet_Lookup(t *testing.T) {
 	var set feature.FlagSet
 
-	set.Bool("flagA")
-	set.Bool("flagB", feature.WithDescription("description"))
+	set.Bool("flagA", false)
+	set.Bool("flagB", true, feature.WithDescription("description"))
 
 	flagA, okA := set.Lookup("flagA")
 	assertEquals(t, "flagA", flagA.Name, "flagA name mismatch")
+	assertEquals(t, false, flagA.Value, "flagA value mismatch")
 	assertEquals(t, "", flagA.Description, "flagA description mismatch")
 	assertEquals(t, true, okA, "flagA not marked as ok")
 
 	flagB, okB := set.Lookup("flagB")
 	assertEquals(t, "flagB", flagB.Name, "flagB name mismatch")
+	assertEquals(t, true, flagB.Value, "flagB value mismatch")
 	assertEquals(t, "description", flagB.Description, "flagB name mismatch")
 	assertEquals(t, true, okB, "flagB not marked as ok")
 
 	flagC, okC := set.Lookup("flagC")
 	assertEquals(t, "", flagC.Name, "flagC name mismatch")
+	assertEquals(t, nil, flagC.Value, "flagC value mismatch")
 	assertEquals(t, "", flagC.Description, "flagC name mismatch")
 	assertEquals(t, false, okC, "flagC marked as ok")
 }
@@ -86,10 +89,10 @@ func TestFlagSet_Lookup(t *testing.T) {
 func TestFlagSet_Bool(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.String("test")
+		set.String("test", "")
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			set.Bool("test")
+			set.Bool("test", false)
 		})
 	})
 
@@ -97,7 +100,7 @@ func TestFlagSet_Bool(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.Bool("test")
+		v := set.Bool("test", false)
 		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) bool)
 
 		assertEquals(t, false, v(ctx), "")
@@ -122,10 +125,10 @@ func TestFlagSet_Bool(t *testing.T) {
 func TestFlagSet_Float(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.Bool("test")
+		set.Bool("test", false)
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			set.Float("test")
+			set.Float("test", 0.0)
 		})
 	})
 
@@ -133,11 +136,11 @@ func TestFlagSet_Float(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.Float("test")
+		v := set.Float("test", 5.0)
 		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) float64)
 
-		assertEquals(t, 0.0, v(ctx), "")
-		assertEquals(t, 0.0, v2(ctx), "")
+		assertEquals(t, 5.0, v(ctx), "")
+		assertEquals(t, 5.0, v2(ctx), "")
 
 		set.SetRegistry(&feature.SimpleRegistry{FloatFunc: func(context.Context, string) float64 {
 			return 1.0
@@ -158,10 +161,10 @@ func TestFlagSet_Float(t *testing.T) {
 func TestFlagSet_Int(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.Float("test")
+		set.Float("test", 0.0)
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			set.Int("test")
+			set.Int("test", 0)
 		})
 	})
 
@@ -169,11 +172,11 @@ func TestFlagSet_Int(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.Int("test")
+		v := set.Int("test", 5)
 		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) int64)
 
-		assertEquals(t, 0, v(ctx), "")
-		assertEquals(t, 0, v2(ctx), "")
+		assertEquals(t, 5, v(ctx), "")
+		assertEquals(t, 5, v2(ctx), "")
 
 		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int64 {
 			return 1
@@ -194,10 +197,10 @@ func TestFlagSet_Int(t *testing.T) {
 func TestFlagSet_String(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.Int("test")
+		set.Int("test", 0)
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			set.String("test")
+			set.String("test", "")
 		})
 	})
 
@@ -205,11 +208,11 @@ func TestFlagSet_String(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.String("test")
+		v := set.String("test", "default")
 		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) string)
 
-		assertEquals(t, "", v(ctx), "")
-		assertEquals(t, "", v2(ctx), "")
+		assertEquals(t, "default", v(ctx), "")
+		assertEquals(t, "default", v2(ctx), "")
 
 		set.SetRegistry(&feature.SimpleRegistry{StringFunc: func(context.Context, string) string {
 			return "one"
@@ -230,10 +233,10 @@ func TestFlagSet_String(t *testing.T) {
 func TestFlagSet_Uint(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.Float("test")
+		set.Float("test", 0.0)
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			set.Uint("test")
+			set.Uint("test", 0)
 		})
 	})
 
@@ -241,11 +244,11 @@ func TestFlagSet_Uint(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.Uint("test")
+		v := set.Uint("test", 5)
 		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) uint64)
 
-		assertEquals(t, 0, v(ctx), "")
-		assertEquals(t, 0, v2(ctx), "")
+		assertEquals(t, 5, v(ctx), "")
+		assertEquals(t, 5, v2(ctx), "")
 
 		set.SetRegistry(&feature.SimpleRegistry{UintFunc: func(context.Context, string) uint64 {
 			return 1
@@ -266,7 +269,7 @@ func TestFlagSet_Uint(t *testing.T) {
 func TestLabels(t *testing.T) {
 	var s feature.FlagSet
 
-	s.Bool("test",
+	s.Bool("test", false,
 		feature.WithLabel("labelC", "C"),
 		feature.WithLabel("labelB", "B"),
 		feature.WithLabel("labelE", "E"),
@@ -307,7 +310,7 @@ func BenchmarkFlagSet_Bool(b *testing.B) {
 	var set feature.FlagSet
 	set.SetRegistry(testRegistry)
 
-	f := set.Bool("test")
+	f := set.Bool("test", false)
 	b.ReportAllocs()
 
 	for b.Loop() {
@@ -321,7 +324,7 @@ func BenchmarkFlagSet_Float(b *testing.B) {
 	var set feature.FlagSet
 	set.SetRegistry(testRegistry)
 
-	f := set.Float("test")
+	f := set.Float("test", 0.0)
 	b.ReportAllocs()
 
 	for b.Loop() {
@@ -335,7 +338,7 @@ func BenchmarkFlagSet_Int(b *testing.B) {
 	var set feature.FlagSet
 	set.SetRegistry(testRegistry)
 
-	f := set.Int("test")
+	f := set.Int("test", 0)
 	b.ReportAllocs()
 
 	for b.Loop() {
@@ -349,7 +352,7 @@ func BenchmarkFlagSet_String(b *testing.B) {
 	var set feature.FlagSet
 	set.SetRegistry(testRegistry)
 
-	f := set.String("test")
+	f := set.String("test", "")
 	b.ReportAllocs()
 
 	for b.Loop() {
@@ -363,7 +366,7 @@ func BenchmarkFlagSet_Uint(b *testing.B) {
 	var set feature.FlagSet
 	set.SetRegistry(testRegistry)
 
-	f := set.Uint("test")
+	f := set.Uint("test", 0)
 	b.ReportAllocs()
 
 	for b.Loop() {

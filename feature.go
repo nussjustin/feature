@@ -13,8 +13,11 @@ var ErrDuplicateFlag = errors.New("duplicate flag")
 
 // Flag represents a flag registered with a [FlagSet].
 type Flag struct {
-	// Name is the name of the feature as passed to [Register].
+	// Name is the name of the feature flag.
 	Name string
+
+	// Value is the default value for the flag as specified on creation.
+	Value any
 
 	// Description is an optional description specified using [WithDescription].
 	Description string
@@ -88,8 +91,8 @@ func (s *FlagSet) SetRegistry(r Registry) {
 	}
 }
 
-func (s *FlagSet) add(name string, fun any, opts ...Option) {
-	f := Flag{Name: name, Func: fun}
+func (s *FlagSet) add(name string, value any, fun any, opts ...Option) {
+	f := Flag{Name: name, Value: value, Func: fun}
 	for _, opt := range opts {
 		opt(&f)
 	}
@@ -107,16 +110,16 @@ func (s *FlagSet) add(name string, fun any, opts ...Option) {
 // Bool registers a new flag that represents a boolean value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Bool(name string, opts ...Option) func(context.Context) bool {
+func (s *FlagSet) Bool(name string, value bool, opts ...Option) func(context.Context) bool {
 	f := func(ctx context.Context) bool {
 		r := s.registry.Load()
 		if r == nil {
-			return false
+			return value
 		}
 		return (*r).Bool(ctx, name)
 	}
 
-	s.add(name, f, opts...)
+	s.add(name, value, f, opts...)
 
 	return f
 }
@@ -124,16 +127,16 @@ func (s *FlagSet) Bool(name string, opts ...Option) func(context.Context) bool {
 // Float registers a new flag that represents a float value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Float(name string, opts ...Option) func(context.Context) float64 {
+func (s *FlagSet) Float(name string, value float64, opts ...Option) func(context.Context) float64 {
 	f := func(ctx context.Context) float64 {
 		r := s.registry.Load()
 		if r == nil {
-			return 0.0
+			return value
 		}
 		return (*r).Float(ctx, name)
 	}
 
-	s.add(name, f, opts...)
+	s.add(name, value, f, opts...)
 
 	return f
 }
@@ -141,16 +144,16 @@ func (s *FlagSet) Float(name string, opts ...Option) func(context.Context) float
 // Int registers a new flag that represents an int64 value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Int(name string, opts ...Option) func(context.Context) int64 {
+func (s *FlagSet) Int(name string, value int64, opts ...Option) func(context.Context) int64 {
 	f := func(ctx context.Context) int64 {
 		r := s.registry.Load()
 		if r == nil {
-			return 0
+			return value
 		}
 		return (*r).Int(ctx, name)
 	}
 
-	s.add(name, f, opts...)
+	s.add(name, value, f, opts...)
 
 	return f
 }
@@ -158,16 +161,16 @@ func (s *FlagSet) Int(name string, opts ...Option) func(context.Context) int64 {
 // String registers a new flag that represents a string value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) String(name string, opts ...Option) func(context.Context) string {
+func (s *FlagSet) String(name string, value string, opts ...Option) func(context.Context) string {
 	f := func(ctx context.Context) string {
 		r := s.registry.Load()
 		if r == nil {
-			return ""
+			return value
 		}
 		return (*r).String(ctx, name)
 	}
 
-	s.add(name, f, opts...)
+	s.add(name, value, f, opts...)
 
 	return f
 }
@@ -175,16 +178,16 @@ func (s *FlagSet) String(name string, opts ...Option) func(context.Context) stri
 // Uint registers a new flag that represents an uint64 value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Uint(name string, opts ...Option) func(context.Context) uint64 {
+func (s *FlagSet) Uint(name string, value uint64, opts ...Option) func(context.Context) uint64 {
 	f := func(ctx context.Context) uint64 {
 		r := s.registry.Load()
 		if r == nil {
-			return 0
+			return value
 		}
 		return (*r).Uint(ctx, name)
 	}
 
-	s.add(name, f, opts...)
+	s.add(name, value, f, opts...)
 
 	return f
 }
