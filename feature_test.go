@@ -1,7 +1,6 @@
 package feature_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -47,21 +46,24 @@ func TestFlagSet_Lookup(t *testing.T) {
 	var set feature.FlagSet
 
 	set.Bool("flagA", false)
-	set.Bool("flagB", true, feature.WithDescription("description"))
+	set.String("flagB", "test", feature.WithDescription("description"))
 
 	flagA, okA := set.Lookup("flagA")
+	assertEquals(t, feature.FlagKindBool, flagA.Kind, "flagA kind mismatch")
 	assertEquals(t, "flagA", flagA.Name, "flagA name mismatch")
 	assertEquals(t, false, flagA.Value, "flagA value mismatch")
 	assertEquals(t, "", flagA.Description, "flagA description mismatch")
 	assertEquals(t, true, okA, "flagA not marked as ok")
 
 	flagB, okB := set.Lookup("flagB")
+	assertEquals(t, feature.FlagKindString, flagB.Kind, "flagB kind mismatch")
 	assertEquals(t, "flagB", flagB.Name, "flagB name mismatch")
-	assertEquals(t, true, flagB.Value, "flagB value mismatch")
+	assertEquals(t, "test", flagB.Value, "flagB value mismatch")
 	assertEquals(t, "description", flagB.Description, "flagB name mismatch")
 	assertEquals(t, true, okB, "flagB not marked as ok")
 
 	flagC, okC := set.Lookup("flagC")
+	assertEquals(t, feature.FlagKindInvalid, flagC.Kind, "flagC kind mismatch")
 	assertEquals(t, "", flagC.Name, "flagC name mismatch")
 	assertEquals(t, nil, flagC.Value, "flagC value mismatch")
 	assertEquals(t, "", flagC.Description, "flagC name mismatch")
@@ -79,7 +81,7 @@ func TestFlagSet_Context(t *testing.T) {
 		var set feature.FlagSet
 		set.Int("test", 5)
 
-		assertPanicErrorString(t, `invalid value for flag "test"`, func() {
+		assertPanicErrorString(t, `invalid value kind for flag "test"`, func() {
 			set.Context(t.Context(), feature.StringValue("test", "value"))
 		})
 	})
@@ -100,10 +102,8 @@ func TestFlagSet_Bool(t *testing.T) {
 
 		var set feature.FlagSet
 		v := set.Bool("test", false)
-		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) bool)
 
 		assertEquals(t, false, v(ctx), "")
-		assertEquals(t, false, v2(ctx), "")
 	})
 
 	t.Run("Value", func(t *testing.T) {
@@ -142,10 +142,8 @@ func TestFlagSet_Float(t *testing.T) {
 
 		var set feature.FlagSet
 		v := set.Float("test", 5.0)
-		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) float64)
 
 		assertEquals(t, 5.0, v(ctx), "")
-		assertEquals(t, 5.0, v2(ctx), "")
 	})
 
 	t.Run("Value", func(t *testing.T) {
@@ -184,10 +182,8 @@ func TestFlagSet_Int(t *testing.T) {
 
 		var set feature.FlagSet
 		v := set.Int("test", 5)
-		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) int)
 
 		assertEquals(t, 5, v(ctx), "")
-		assertEquals(t, 5, v2(ctx), "")
 	})
 
 	t.Run("Value", func(t *testing.T) {
@@ -226,10 +222,8 @@ func TestFlagSet_String(t *testing.T) {
 
 		var set feature.FlagSet
 		v := set.String("test", "default")
-		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) string)
 
 		assertEquals(t, "default", v(ctx), "")
-		assertEquals(t, "default", v2(ctx), "")
 	})
 
 	t.Run("Value", func(t *testing.T) {
@@ -268,10 +262,8 @@ func TestFlagSet_Uint(t *testing.T) {
 
 		var set feature.FlagSet
 		v := set.Uint("test", 5)
-		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) uint)
 
 		assertEquals(t, 5, v(ctx), "")
-		assertEquals(t, 5, v2(ctx), "")
 	})
 
 	t.Run("Value", func(t *testing.T) {
@@ -487,6 +479,8 @@ func assertPanic(tb testing.TB, want error, f func()) {
 	tb.Helper()
 
 	defer func() {
+		tb.Helper()
+
 		got := recover()
 		if got == nil {
 			tb.Errorf("expected panic with error %q, call did not panic", want)
@@ -507,6 +501,8 @@ func assertPanicErrorString(tb testing.TB, want string, f func()) {
 	tb.Helper()
 
 	defer func() {
+		tb.Helper()
+
 		got := recover()
 		if got == nil {
 			tb.Errorf("expected panic with error %q, call did not panic", want)

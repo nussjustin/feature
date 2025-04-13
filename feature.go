@@ -14,6 +14,9 @@ var ErrDuplicateFlag = errors.New("duplicate flag")
 
 // Flag represents a flag registered with a [FlagSet].
 type Flag struct {
+	// Kind contains the flags kind or type.
+	Kind FlagKind
+
 	// Name is the name of the feature flag.
 	Name string
 
@@ -25,10 +28,30 @@ type Flag struct {
 
 	// Labels contains the labels specified via [WithLabels].
 	Labels Labels
-
-	// Func is the function returned when the flag was registered.
-	Func any
 }
+
+// FlagKind is an enum of potential flag kinds.
+type FlagKind uint8
+
+const (
+	// FlagKindInvalid is the zero value of FlagKind and is not considered valid value.
+	FlagKindInvalid FlagKind = iota
+
+	// FlagKindBool denotes a boolean flag created using [FlagSet.Bool].
+	FlagKindBool
+
+	// FlagKindInt denotes a boolean flag created using [FlagSet.Int].
+	FlagKindInt
+
+	// FlagKindFloat denotes a boolean flag created using [FlagSet.Float].
+	FlagKindFloat
+
+	// FlagKindString denotes a boolean flag created using [FlagSet.String].
+	FlagKindString
+
+	// FlagKindUint denotes a boolean flag created using [FlagSet.Uint].
+	FlagKindUint
+)
 
 // FlagSet represents a set of defined feature flags.
 //
@@ -63,7 +86,7 @@ func (l *Labels) Len() int {
 type Value struct {
 	name string
 
-	kind   valueKind
+	kind   FlagKind
 	bool   bool
 	int    int
 	float  float64
@@ -74,16 +97,6 @@ type Value struct {
 type valuesMap map[string]Value
 
 type valuesMapKey FlagSet
-
-type valueKind uint8
-
-const (
-	valueKindBool valueKind = iota
-	valueKindInt
-	valueKindFloat
-	valueKindString
-	valueKindUint
-)
 
 // All yields all registered flags sorted by name.
 func (s *FlagSet) All(yield func(Flag) bool) {
@@ -129,23 +142,8 @@ func (s *FlagSet) Context(ctx context.Context, values ...Value) context.Context 
 			continue
 		}
 
-		switch v.kind {
-		case valueKindBool:
-			_, ok = f.Value.(bool)
-		case valueKindInt:
-			_, ok = f.Value.(int)
-		case valueKindFloat:
-			_, ok = f.Value.(float64)
-		case valueKindString:
-			_, ok = f.Value.(string)
-		case valueKindUint:
-			_, ok = f.Value.(uint)
-		default:
-			panic("unreachable")
-		}
-
-		if !ok {
-			panic(fmt.Errorf("invalid value for flag %q", v.name))
+		if f.Kind != v.kind {
+			panic(fmt.Errorf("invalid value kind for flag %q", v.name))
 		}
 
 		m[v.name] = v
@@ -154,7 +152,7 @@ func (s *FlagSet) Context(ctx context.Context, values ...Value) context.Context 
 	return context.WithValue(ctx, (*valuesMapKey)(s), m)
 }
 
-func (s *FlagSet) value(ctx context.Context, name string, kind valueKind) (Value, bool) {
+func (s *FlagSet) value(ctx context.Context, name string, kind FlagKind) (Value, bool) {
 	m, ok := ctx.Value((*valuesMapKey)(s)).(valuesMap)
 	if !ok {
 		return Value{}, false
@@ -166,8 +164,8 @@ func (s *FlagSet) value(ctx context.Context, name string, kind valueKind) (Value
 	return v, true
 }
 
-func (s *FlagSet) add(name string, value any, fun any, opts ...Option) {
-	f := Flag{Name: name, Value: value, Func: fun}
+func (s *FlagSet) add(kind FlagKind, name string, value any, opts ...Option) {
+	f := Flag{Kind: kind, Name: name, Value: value}
 	for _, opt := range opts {
 		opt(&f)
 	}
@@ -186,7 +184,7 @@ func (s *FlagSet) add(name string, value any, fun any, opts ...Option) {
 
 // BoolValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
 func BoolValue(name string, value bool) Value {
-	return Value{name: name, kind: valueKindBool, bool: value}
+	return Value{name: name, kind: FlagKindBool, bool: value}
 }
 
 // Bool registers a new flag that represents a boolean value.
@@ -194,21 +192,21 @@ func BoolValue(name string, value bool) Value {
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Bool(name string, value bool, opts ...Option) func(context.Context) bool {
 	f := func(ctx context.Context) bool {
-		v, ok := s.value(ctx, name, valueKindBool)
+		v, ok := s.value(ctx, name, FlagKindBool)
 		if ok {
 			return v.bool
 		}
 		return value
 	}
 
-	s.add(name, value, f, opts...)
+	s.add(FlagKindBool, name, value, opts...)
 
 	return f
 }
 
 // FloatValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
 func FloatValue(name string, value float64) Value {
-	return Value{name: name, kind: valueKindFloat, float: value}
+	return Value{name: name, kind: FlagKindFloat, float: value}
 }
 
 // Float registers a new flag that represents a float value.
@@ -216,21 +214,21 @@ func FloatValue(name string, value float64) Value {
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Float(name string, value float64, opts ...Option) func(context.Context) float64 {
 	f := func(ctx context.Context) float64 {
-		v, ok := s.value(ctx, name, valueKindFloat)
+		v, ok := s.value(ctx, name, FlagKindFloat)
 		if ok {
 			return v.float
 		}
 		return value
 	}
 
-	s.add(name, value, f, opts...)
+	s.add(FlagKindFloat, name, value, opts...)
 
 	return f
 }
 
 // IntValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
 func IntValue(name string, value int) Value {
-	return Value{name: name, kind: valueKindInt, int: value}
+	return Value{name: name, kind: FlagKindInt, int: value}
 }
 
 // Int registers a new flag that represents an int value.
@@ -238,21 +236,21 @@ func IntValue(name string, value int) Value {
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Int(name string, value int, opts ...Option) func(context.Context) int {
 	f := func(ctx context.Context) int {
-		v, ok := s.value(ctx, name, valueKindInt)
+		v, ok := s.value(ctx, name, FlagKindInt)
 		if ok {
 			return v.int
 		}
 		return value
 	}
 
-	s.add(name, value, f, opts...)
+	s.add(FlagKindInt, name, value, opts...)
 
 	return f
 }
 
 // StringValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
 func StringValue(name string, value string) Value {
-	return Value{name: name, kind: valueKindString, string: value}
+	return Value{name: name, kind: FlagKindString, string: value}
 }
 
 // String registers a new flag that represents a string value.
@@ -260,21 +258,21 @@ func StringValue(name string, value string) Value {
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) String(name string, value string, opts ...Option) func(context.Context) string {
 	f := func(ctx context.Context) string {
-		v, ok := s.value(ctx, name, valueKindString)
+		v, ok := s.value(ctx, name, FlagKindString)
 		if ok {
 			return v.string
 		}
 		return value
 	}
 
-	s.add(name, value, f, opts...)
+	s.add(FlagKindString, name, value, opts...)
 
 	return f
 }
 
 // UintValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
 func UintValue(name string, value uint) Value {
-	return Value{name: name, kind: valueKindUint, uint: value}
+	return Value{name: name, kind: FlagKindUint, uint: value}
 }
 
 // Uint registers a new flag that represents an uint value.
@@ -282,14 +280,14 @@ func UintValue(name string, value uint) Value {
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Uint(name string, value uint, opts ...Option) func(context.Context) uint {
 	f := func(ctx context.Context) uint {
-		v, ok := s.value(ctx, name, valueKindUint)
+		v, ok := s.value(ctx, name, FlagKindUint)
 		if ok {
 			return v.uint
 		}
 		return value
 	}
 
-	s.add(name, value, f, opts...)
+	s.add(FlagKindUint, name, value, opts...)
 
 	return f
 }
