@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// ErrDuplicateFlag is returned by if a flag with a given name is already registered.
+// ErrDuplicateFlag is thrown by methods like [FlagSet.Bool] if a flag with a given name is already registered.
 var ErrDuplicateFlag = errors.New("duplicate flag")
 
 // Flag represents a flag registered with a [FlagSet].
