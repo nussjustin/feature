@@ -16,7 +16,7 @@ Currently, the supported methods are
 * [FlagSet.Float][2] for float flags,
 * [FlagSet.Int][3] for int flags and
 * [FlagSet.String][4] for string flags.
-* [FlagSet.Uint][8] for string flags.
+* [FlagSet.Uint][8] for uint flags.
 
 Each method will return a callback that takes a `context.Context` and returns a value of the specific type.
 

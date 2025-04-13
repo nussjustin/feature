@@ -141,11 +141,11 @@ func (s *FlagSet) Float(name string, value float64, opts ...Option) func(context
 	return f
 }
 
-// Int registers a new flag that represents an int64 value.
+// Int registers a new flag that represents an int value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Int(name string, value int64, opts ...Option) func(context.Context) int64 {
-	f := func(ctx context.Context) int64 {
+func (s *FlagSet) Int(name string, value int, opts ...Option) func(context.Context) int {
+	f := func(ctx context.Context) int {
 		r := s.registry.Load()
 		if r == nil {
 			return value
@@ -175,11 +175,11 @@ func (s *FlagSet) String(name string, value string, opts ...Option) func(context
 	return f
 }
 
-// Uint registers a new flag that represents an uint64 value.
+// Uint registers a new flag that represents an uint value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Uint(name string, value uint64, opts ...Option) func(context.Context) uint64 {
-	f := func(ctx context.Context) uint64 {
+func (s *FlagSet) Uint(name string, value uint, opts ...Option) func(context.Context) uint {
+	f := func(ctx context.Context) uint {
 		r := s.registry.Load()
 		if r == nil {
 			return value
@@ -229,13 +229,13 @@ type Registry interface {
 	Float(ctx context.Context, name string) float64
 
 	// Int returns the integer value for the flag with the given name.
-	Int(ctx context.Context, name string) int64
+	Int(ctx context.Context, name string) int
 
 	// String returns the string value for the flag with the given name.
 	String(ctx context.Context, name string) string
 
 	// Uint returns the unsigned integer value for the flag with the given name.
-	Uint(ctx context.Context, name string) uint64
+	Uint(ctx context.Context, name string) uint
 }
 
 // SimpleRegistry implements a [Registry] using callbacks set as struct fields.
@@ -249,13 +249,13 @@ type SimpleRegistry struct {
 	FloatFunc func(ctx context.Context, name string) float64
 
 	// IntFunc contains the implementation for the Registry.Int function.
-	IntFunc func(ctx context.Context, name string) int64
+	IntFunc func(ctx context.Context, name string) int
 
 	// StringFunc contains the implementation for the Registry.String function.
 	StringFunc func(ctx context.Context, name string) string
 
 	// UintFunc contains the implementation for the Registry.Uint function.
-	UintFunc func(ctx context.Context, name string) uint64
+	UintFunc func(ctx context.Context, name string) uint
 }
 
 // Bool implements the [Registry] interface by calling s.BoolFunc and returning the result.
@@ -269,7 +269,7 @@ func (s *SimpleRegistry) Float(ctx context.Context, name string) float64 {
 }
 
 // Int implements the [Registry] interface by calling s.IntFunc and returning the result.
-func (s *SimpleRegistry) Int(ctx context.Context, name string) int64 {
+func (s *SimpleRegistry) Int(ctx context.Context, name string) int {
 	return s.IntFunc(ctx, name)
 }
 
@@ -279,6 +279,6 @@ func (s *SimpleRegistry) String(ctx context.Context, name string) string {
 }
 
 // Uint implements the [Registry] interface by calling s.UintFunc and returning the result.
-func (s *SimpleRegistry) Uint(ctx context.Context, name string) uint64 {
+func (s *SimpleRegistry) Uint(ctx context.Context, name string) uint {
 	return s.UintFunc(ctx, name)
 }

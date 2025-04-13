@@ -17,13 +17,13 @@ var testRegistry = &feature.SimpleRegistry{
 	FloatFunc: func(context.Context, string) float64 {
 		return 2.5
 	},
-	IntFunc: func(context.Context, string) int64 {
+	IntFunc: func(context.Context, string) int {
 		return 1
 	},
 	StringFunc: func(context.Context, string) string {
 		return "string"
 	},
-	UintFunc: func(context.Context, string) uint64 {
+	UintFunc: func(context.Context, string) uint {
 		return 2
 	},
 }
@@ -173,19 +173,19 @@ func TestFlagSet_Int(t *testing.T) {
 
 		var set feature.FlagSet
 		v := set.Int("test", 5)
-		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) int64)
+		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) int)
 
 		assertEquals(t, 5, v(ctx), "")
 		assertEquals(t, 5, v2(ctx), "")
 
-		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int64 {
+		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int {
 			return 1
 		}})
 
 		assertEquals(t, 1, v(ctx), "")
 		assertEquals(t, 1, v2(ctx), "")
 
-		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int64 {
+		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int {
 			return 2
 		}})
 
@@ -245,19 +245,19 @@ func TestFlagSet_Uint(t *testing.T) {
 
 		var set feature.FlagSet
 		v := set.Uint("test", 5)
-		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) uint64)
+		v2 := mustLookup(t, &set, "test").Func.(func(context.Context) uint)
 
 		assertEquals(t, 5, v(ctx), "")
 		assertEquals(t, 5, v2(ctx), "")
 
-		set.SetRegistry(&feature.SimpleRegistry{UintFunc: func(context.Context, string) uint64 {
+		set.SetRegistry(&feature.SimpleRegistry{UintFunc: func(context.Context, string) uint {
 			return 1
 		}})
 
 		assertEquals(t, 1, v(ctx), "")
 		assertEquals(t, 1, v2(ctx), "")
 
-		set.SetRegistry(&feature.SimpleRegistry{UintFunc: func(context.Context, string) uint64 {
+		set.SetRegistry(&feature.SimpleRegistry{UintFunc: func(context.Context, string) uint {
 			return 2
 		}})
 
