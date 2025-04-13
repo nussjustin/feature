@@ -10,24 +10,6 @@ import (
 	"github.com/nussjustin/feature"
 )
 
-var testRegistry = &feature.SimpleRegistry{
-	BoolFunc: func(context.Context, string) bool {
-		return true
-	},
-	FloatFunc: func(context.Context, string) float64 {
-		return 2.5
-	},
-	IntFunc: func(context.Context, string) int {
-		return 1
-	},
-	StringFunc: func(context.Context, string) string {
-		return "string"
-	},
-	UintFunc: func(context.Context, string) uint {
-		return 2
-	},
-}
-
 func TestFlagSet_All(t *testing.T) {
 	var set feature.FlagSet
 
@@ -86,6 +68,23 @@ func TestFlagSet_Lookup(t *testing.T) {
 	assertEquals(t, false, okC, "flagC marked as ok")
 }
 
+func TestFlagSet_Context(t *testing.T) {
+	t.Run("Ignores unknown", func(t *testing.T) {
+		var set feature.FlagSet
+
+		set.Context(t.Context(), feature.StringValue("test", "value"))
+	})
+
+	t.Run("Panics on wrong type", func(t *testing.T) {
+		var set feature.FlagSet
+		set.Int("test", 5)
+
+		assertPanicErrorString(t, `invalid value for flag "test"`, func() {
+			set.Context(t.Context(), feature.StringValue("test", "value"))
+		})
+	})
+}
+
 func TestFlagSet_Bool(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
@@ -96,7 +95,7 @@ func TestFlagSet_Bool(t *testing.T) {
 		})
 	})
 
-	t.Run("Register", func(t *testing.T) {
+	t.Run("Default", func(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
@@ -105,19 +104,25 @@ func TestFlagSet_Bool(t *testing.T) {
 
 		assertEquals(t, false, v(ctx), "")
 		assertEquals(t, false, v2(ctx), "")
+	})
 
-		set.SetRegistry(&feature.SimpleRegistry{BoolFunc: func(context.Context, string) bool {
-			return true
-		}})
+	t.Run("Value", func(t *testing.T) {
+		ctx := t.Context()
 
-		assertEquals(t, true, v(ctx), "")
-		assertEquals(t, true, v2(ctx), "")
+		var set feature.FlagSet
+		v1 := set.Bool("test1", false)
+		v2 := set.Bool("test2", true)
 
-		set.SetRegistry(&feature.SimpleRegistry{BoolFunc: func(context.Context, string) bool {
-			return false
-		}})
+		ctx = set.Context(ctx,
+			feature.BoolValue("test1", true),
+			feature.BoolValue("test2", false))
 
-		assertEquals(t, false, v(ctx), "")
+		var otherSet feature.FlagSet
+		ctx = otherSet.Context(ctx,
+			feature.BoolValue("test1", false),
+			feature.BoolValue("test2", true))
+
+		assertEquals(t, true, v1(ctx), "")
 		assertEquals(t, false, v2(ctx), "")
 	})
 }
@@ -132,7 +137,7 @@ func TestFlagSet_Float(t *testing.T) {
 		})
 	})
 
-	t.Run("Register", func(t *testing.T) {
+	t.Run("Default", func(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
@@ -141,20 +146,26 @@ func TestFlagSet_Float(t *testing.T) {
 
 		assertEquals(t, 5.0, v(ctx), "")
 		assertEquals(t, 5.0, v2(ctx), "")
+	})
 
-		set.SetRegistry(&feature.SimpleRegistry{FloatFunc: func(context.Context, string) float64 {
-			return 1.0
-		}})
+	t.Run("Value", func(t *testing.T) {
+		ctx := t.Context()
 
-		assertEquals(t, 1.0, v(ctx), "")
-		assertEquals(t, 1.0, v2(ctx), "")
+		var set feature.FlagSet
+		v1 := set.Float("test1", 5.0)
+		v2 := set.Float("test2", 10.0)
 
-		set.SetRegistry(&feature.SimpleRegistry{FloatFunc: func(context.Context, string) float64 {
-			return 2.0
-		}})
+		ctx = set.Context(ctx,
+			feature.FloatValue("test1", 15.0),
+			feature.FloatValue("test2", 20.0))
 
-		assertEquals(t, 2.0, v(ctx), "")
-		assertEquals(t, 2.0, v2(ctx), "")
+		var otherSet feature.FlagSet
+		ctx = otherSet.Context(ctx,
+			feature.FloatValue("test1", 25.0),
+			feature.FloatValue("test2", 30.0))
+
+		assertEquals(t, 15.0, v1(ctx), "")
+		assertEquals(t, 20.0, v2(ctx), "")
 	})
 }
 
@@ -168,7 +179,7 @@ func TestFlagSet_Int(t *testing.T) {
 		})
 	})
 
-	t.Run("Register", func(t *testing.T) {
+	t.Run("Default", func(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
@@ -177,20 +188,26 @@ func TestFlagSet_Int(t *testing.T) {
 
 		assertEquals(t, 5, v(ctx), "")
 		assertEquals(t, 5, v2(ctx), "")
+	})
 
-		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int {
-			return 1
-		}})
+	t.Run("Value", func(t *testing.T) {
+		ctx := t.Context()
 
-		assertEquals(t, 1, v(ctx), "")
-		assertEquals(t, 1, v2(ctx), "")
+		var set feature.FlagSet
+		v1 := set.Int("test1", 5)
+		v2 := set.Int("test2", 10)
 
-		set.SetRegistry(&feature.SimpleRegistry{IntFunc: func(context.Context, string) int {
-			return 2
-		}})
+		ctx = set.Context(ctx,
+			feature.IntValue("test1", 15),
+			feature.IntValue("test2", 20))
 
-		assertEquals(t, 2, v(ctx), "")
-		assertEquals(t, 2, v2(ctx), "")
+		var otherSet feature.FlagSet
+		ctx = otherSet.Context(ctx,
+			feature.IntValue("test1", 25),
+			feature.IntValue("test2", 30))
+
+		assertEquals(t, 15, v1(ctx), "")
+		assertEquals(t, 20, v2(ctx), "")
 	})
 }
 
@@ -204,7 +221,7 @@ func TestFlagSet_String(t *testing.T) {
 		})
 	})
 
-	t.Run("Register", func(t *testing.T) {
+	t.Run("Default", func(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
@@ -213,20 +230,26 @@ func TestFlagSet_String(t *testing.T) {
 
 		assertEquals(t, "default", v(ctx), "")
 		assertEquals(t, "default", v2(ctx), "")
+	})
 
-		set.SetRegistry(&feature.SimpleRegistry{StringFunc: func(context.Context, string) string {
-			return "one"
-		}})
+	t.Run("Value", func(t *testing.T) {
+		ctx := t.Context()
 
-		assertEquals(t, "one", v(ctx), "")
-		assertEquals(t, "one", v2(ctx), "")
+		var set feature.FlagSet
+		v1 := set.String("test1", "test1")
+		v2 := set.String("test2", "test2")
 
-		set.SetRegistry(&feature.SimpleRegistry{StringFunc: func(context.Context, string) string {
-			return "two"
-		}})
+		ctx = set.Context(ctx,
+			feature.StringValue("test1", "test1 changed"),
+			feature.StringValue("test2", "test2 changed"))
 
-		assertEquals(t, "two", v(ctx), "")
-		assertEquals(t, "two", v2(ctx), "")
+		var otherSet feature.FlagSet
+		ctx = otherSet.Context(ctx,
+			feature.StringValue("test1", "test1 changed again"),
+			feature.StringValue("test2", "test2 changed again"))
+
+		assertEquals(t, "test1 changed", v1(ctx), "")
+		assertEquals(t, "test2 changed", v2(ctx), "")
 	})
 }
 
@@ -240,7 +263,7 @@ func TestFlagSet_Uint(t *testing.T) {
 		})
 	})
 
-	t.Run("Register", func(t *testing.T) {
+	t.Run("Default", func(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
@@ -249,20 +272,26 @@ func TestFlagSet_Uint(t *testing.T) {
 
 		assertEquals(t, 5, v(ctx), "")
 		assertEquals(t, 5, v2(ctx), "")
+	})
 
-		set.SetRegistry(&feature.SimpleRegistry{UintFunc: func(context.Context, string) uint {
-			return 1
-		}})
+	t.Run("Value", func(t *testing.T) {
+		ctx := t.Context()
 
-		assertEquals(t, 1, v(ctx), "")
-		assertEquals(t, 1, v2(ctx), "")
+		var set feature.FlagSet
+		v1 := set.Uint("test1", 5)
+		v2 := set.Uint("test2", 10)
 
-		set.SetRegistry(&feature.SimpleRegistry{UintFunc: func(context.Context, string) uint {
-			return 2
-		}})
+		ctx = set.Context(ctx,
+			feature.UintValue("test1", 15),
+			feature.UintValue("test2", 20))
 
-		assertEquals(t, 2, v(ctx), "")
-		assertEquals(t, 2, v2(ctx), "")
+		var otherSet feature.FlagSet
+		ctx = otherSet.Context(ctx,
+			feature.UintValue("test1", 25),
+			feature.UintValue("test2", 30))
+
+		assertEquals(t, 15, v1(ctx), "")
+		assertEquals(t, 20, v2(ctx), "")
 	})
 }
 
@@ -305,73 +334,133 @@ func TestLabels(t *testing.T) {
 }
 
 func BenchmarkFlagSet_Bool(b *testing.B) {
-	ctx := b.Context()
+	b.Run("Context", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.Bool("test", false)
+		ctx := set.Context(b.Context(), feature.BoolValue("test", true))
 
-	var set feature.FlagSet
-	set.SetRegistry(testRegistry)
+		b.ReportAllocs()
 
-	f := set.Bool("test", false)
-	b.ReportAllocs()
+		for b.Loop() {
+			flag(ctx)
+		}
+	})
 
-	for b.Loop() {
-		f(ctx)
-	}
+	b.Run("Default", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.Bool("test", false)
+		ctx := set.Context(b.Context(), feature.BoolValue("unused", false))
+
+		b.ReportAllocs()
+
+		for b.Loop() {
+			flag(ctx)
+		}
+	})
 }
 
 func BenchmarkFlagSet_Float(b *testing.B) {
-	ctx := b.Context()
+	b.Run("Context", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.Float("test", 5.0)
+		ctx := set.Context(b.Context(), feature.FloatValue("test", 5.0))
 
-	var set feature.FlagSet
-	set.SetRegistry(testRegistry)
+		b.ReportAllocs()
 
-	f := set.Float("test", 0.0)
-	b.ReportAllocs()
+		for b.Loop() {
+			flag(ctx)
+		}
+	})
 
-	for b.Loop() {
-		f(ctx)
-	}
+	b.Run("Default", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.Float("test", 5.0)
+		ctx := set.Context(b.Context(), feature.FloatValue("unused", 0.0))
+
+		b.ReportAllocs()
+
+		for b.Loop() {
+			flag(ctx)
+		}
+	})
 }
 
 func BenchmarkFlagSet_Int(b *testing.B) {
-	ctx := b.Context()
+	b.Run("Context", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.Int("test", 5.0)
+		ctx := set.Context(b.Context(), feature.IntValue("test", 5))
 
-	var set feature.FlagSet
-	set.SetRegistry(testRegistry)
+		b.ReportAllocs()
 
-	f := set.Int("test", 0)
-	b.ReportAllocs()
+		for b.Loop() {
+			flag(ctx)
+		}
+	})
 
-	for b.Loop() {
-		f(ctx)
-	}
+	b.Run("Default", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.Int("test", 5.0)
+		ctx := set.Context(b.Context(), feature.IntValue("unused", 0))
+
+		b.ReportAllocs()
+
+		for b.Loop() {
+			flag(ctx)
+		}
+	})
 }
 
 func BenchmarkFlagSet_String(b *testing.B) {
-	ctx := b.Context()
+	b.Run("Context", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.String("test", "test")
+		ctx := set.Context(b.Context(), feature.StringValue("test", "test"))
 
-	var set feature.FlagSet
-	set.SetRegistry(testRegistry)
+		b.ReportAllocs()
 
-	f := set.String("test", "")
-	b.ReportAllocs()
+		for b.Loop() {
+			flag(ctx)
+		}
+	})
 
-	for b.Loop() {
-		f(ctx)
-	}
+	b.Run("Default", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.String("test", "test")
+		ctx := set.Context(b.Context(), feature.StringValue("unused", ""))
+
+		b.ReportAllocs()
+
+		for b.Loop() {
+			flag(ctx)
+		}
+	})
 }
 
 func BenchmarkFlagSet_Uint(b *testing.B) {
-	ctx := b.Context()
+	b.Run("Context", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.Uint("test", 5)
+		ctx := set.Context(b.Context(), feature.UintValue("test", 5))
 
-	var set feature.FlagSet
-	set.SetRegistry(testRegistry)
+		b.ReportAllocs()
 
-	f := set.Uint("test", 0)
-	b.ReportAllocs()
+		for b.Loop() {
+			flag(ctx)
+		}
+	})
 
-	for b.Loop() {
-		f(ctx)
-	}
+	b.Run("Default", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.Uint("test", 5)
+		ctx := set.Context(b.Context(), feature.UintValue("unused", 0))
+
+		b.ReportAllocs()
+
+		for b.Loop() {
+			flag(ctx)
+		}
+	})
 }
 
 func assertEquals[T any](tb testing.TB, want, got T, msg string) {
@@ -408,6 +497,26 @@ func assertPanic(tb testing.TB, want error, f func()) {
 		}
 		if !errors.Is(gotErr, want) {
 			tb.Errorf("expected error %q, got %q", want, gotErr)
+		}
+	}()
+
+	f()
+}
+
+func assertPanicErrorString(tb testing.TB, want string, f func()) {
+	tb.Helper()
+
+	defer func() {
+		got := recover()
+		if got == nil {
+			tb.Errorf("expected panic with error %q, call did not panic", want)
+		}
+		gotErr, ok := got.(error)
+		if !ok {
+			tb.Fatalf("recovered value is not an error: %#v", got)
+		}
+		if gotErr.Error() != want {
+			tb.Errorf("expected error %q, got %q", want, gotErr.Error())
 		}
 	}()
 

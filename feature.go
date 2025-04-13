@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"sync"
-	"sync/atomic"
 )
 
 // ErrDuplicateFlag is returned by if a flag with a given name is already registered.
@@ -33,8 +33,6 @@ type Flag struct {
 //
 // The zero value is valid and returns zero values for all flags.
 type FlagSet struct {
-	registry atomic.Pointer[Registry]
-
 	flagsMu sync.Mutex
 	flags   sortedMap[Flag]
 }
@@ -58,6 +56,34 @@ func (l *Labels) Len() int {
 	return len(l.m.keys)
 }
 
+// Value specifies a custom value for a feature flag, which can be assigned to a [context.Context].
+//
+// A Value must be created using one of [BoolValue], [FloatValue], [IntValue], [StringValue] or [UintValue].
+type Value struct {
+	name string
+
+	kind   valueKind
+	bool   bool
+	int    int
+	float  float64
+	string string
+	uint   uint
+}
+
+type valuesMap map[string]Value
+
+type valuesMapKey FlagSet
+
+type valueKind uint8
+
+const (
+	valueKindBool valueKind = iota
+	valueKindInt
+	valueKindFloat
+	valueKindString
+	valueKindUint
+)
+
 // All yields all registered flags sorted by name.
 func (s *FlagSet) All(yield func(Flag) bool) {
 	s.flagsMu.Lock()
@@ -80,15 +106,68 @@ func (s *FlagSet) Lookup(name string) (Flag, bool) {
 	return f, ok
 }
 
-// SetRegistry sets the Registry to be used for looking up flag values.
+// Context returns a new context based on ctx which will use the given values when checking feature flags.
 //
-// A nil value will cause all flags to return zero values.
-func (s *FlagSet) SetRegistry(r Registry) {
-	if r == nil {
-		s.registry.Store(nil)
-	} else {
-		s.registry.Store(&r)
+// If a values type does not match the flags type, Context will panic.
+//
+// Values with no matching flag are ignored.
+func (s *FlagSet) Context(ctx context.Context, values ...Value) context.Context {
+	if len(values) == 0 {
+		return ctx
 	}
+
+	s.flagsMu.Lock()
+	flags := s.flags
+	s.flagsMu.Unlock()
+
+	m, ok := ctx.Value((*valuesMapKey)(s)).(valuesMap)
+	if !ok {
+		m = make(valuesMap, len(values))
+	} else {
+		m = maps.Clone(m)
+	}
+
+	for _, v := range values {
+		f, ok := flags.m[v.name]
+		if !ok {
+			continue
+		}
+
+		switch v.kind {
+		case valueKindBool:
+			_, ok = f.Value.(bool)
+		case valueKindInt:
+			_, ok = f.Value.(int)
+		case valueKindFloat:
+			_, ok = f.Value.(float64)
+		case valueKindString:
+			_, ok = f.Value.(string)
+		case valueKindUint:
+			_, ok = f.Value.(uint)
+		default:
+			panic("unreachable")
+		}
+
+		if !ok {
+			panic(fmt.Errorf("invalid value for flag %q", v.name))
+		}
+
+		m[v.name] = v
+	}
+
+	return context.WithValue(ctx, (*valuesMapKey)(s), m)
+}
+
+func (s *FlagSet) value(ctx context.Context, name string, kind valueKind) (Value, bool) {
+	m, ok := ctx.Value((*valuesMapKey)(s)).(valuesMap)
+	if !ok {
+		return Value{}, false
+	}
+	v, ok := m[name]
+	if !ok || v.kind != kind {
+		return Value{}, false
+	}
+	return v, true
 }
 
 func (s *FlagSet) add(name string, value any, fun any, opts ...Option) {
@@ -107,21 +186,31 @@ func (s *FlagSet) add(name string, value any, fun any, opts ...Option) {
 	s.flags = s.flags.add(f.Name, f)
 }
 
+// BoolValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
+func BoolValue(name string, value bool) Value {
+	return Value{name: name, kind: valueKindBool, bool: value}
+}
+
 // Bool registers a new flag that represents a boolean value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Bool(name string, value bool, opts ...Option) func(context.Context) bool {
 	f := func(ctx context.Context) bool {
-		r := s.registry.Load()
-		if r == nil {
-			return value
+		v, ok := s.value(ctx, name, valueKindBool)
+		if ok {
+			return v.bool
 		}
-		return (*r).Bool(ctx, name)
+		return value
 	}
 
 	s.add(name, value, f, opts...)
 
 	return f
+}
+
+// FloatValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
+func FloatValue(name string, value float64) Value {
+	return Value{name: name, kind: valueKindFloat, float: value}
 }
 
 // Float registers a new flag that represents a float value.
@@ -129,16 +218,21 @@ func (s *FlagSet) Bool(name string, value bool, opts ...Option) func(context.Con
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Float(name string, value float64, opts ...Option) func(context.Context) float64 {
 	f := func(ctx context.Context) float64 {
-		r := s.registry.Load()
-		if r == nil {
-			return value
+		v, ok := s.value(ctx, name, valueKindFloat)
+		if ok {
+			return v.float
 		}
-		return (*r).Float(ctx, name)
+		return value
 	}
 
 	s.add(name, value, f, opts...)
 
 	return f
+}
+
+// IntValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
+func IntValue(name string, value int) Value {
+	return Value{name: name, kind: valueKindInt, int: value}
 }
 
 // Int registers a new flag that represents an int value.
@@ -146,16 +240,21 @@ func (s *FlagSet) Float(name string, value float64, opts ...Option) func(context
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Int(name string, value int, opts ...Option) func(context.Context) int {
 	f := func(ctx context.Context) int {
-		r := s.registry.Load()
-		if r == nil {
-			return value
+		v, ok := s.value(ctx, name, valueKindInt)
+		if ok {
+			return v.int
 		}
-		return (*r).Int(ctx, name)
+		return value
 	}
 
 	s.add(name, value, f, opts...)
 
 	return f
+}
+
+// StringValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
+func StringValue(name string, value string) Value {
+	return Value{name: name, kind: valueKindString, string: value}
 }
 
 // String registers a new flag that represents a string value.
@@ -163,11 +262,11 @@ func (s *FlagSet) Int(name string, value int, opts ...Option) func(context.Conte
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) String(name string, value string, opts ...Option) func(context.Context) string {
 	f := func(ctx context.Context) string {
-		r := s.registry.Load()
-		if r == nil {
-			return value
+		v, ok := s.value(ctx, name, valueKindString)
+		if ok {
+			return v.string
 		}
-		return (*r).String(ctx, name)
+		return value
 	}
 
 	s.add(name, value, f, opts...)
@@ -175,16 +274,21 @@ func (s *FlagSet) String(name string, value string, opts ...Option) func(context
 	return f
 }
 
+// UintValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
+func UintValue(name string, value uint) Value {
+	return Value{name: name, kind: valueKindUint, uint: value}
+}
+
 // Uint registers a new flag that represents an uint value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Uint(name string, value uint, opts ...Option) func(context.Context) uint {
 	f := func(ctx context.Context) uint {
-		r := s.registry.Load()
-		if r == nil {
-			return value
+		v, ok := s.value(ctx, name, valueKindUint)
+		if ok {
+			return v.uint
 		}
-		return (*r).Uint(ctx, name)
+		return value
 	}
 
 	s.add(name, value, f, opts...)
@@ -218,67 +322,4 @@ func WithLabels(labels map[string]string) Option {
 	return func(f *Flag) {
 		f.Labels.m = f.Labels.m.addMany(labels)
 	}
-}
-
-// Registry defines method for getting the feature flag values by name.
-type Registry interface {
-	// Bool returns the boolean value for the flag with the given name.
-	Bool(ctx context.Context, name string) bool
-
-	// Float returns the float value for the flag with the given name.
-	Float(ctx context.Context, name string) float64
-
-	// Int returns the integer value for the flag with the given name.
-	Int(ctx context.Context, name string) int
-
-	// String returns the string value for the flag with the given name.
-	String(ctx context.Context, name string) string
-
-	// Uint returns the unsigned integer value for the flag with the given name.
-	Uint(ctx context.Context, name string) uint
-}
-
-// SimpleRegistry implements a [Registry] using callbacks set as struct fields.
-//
-// Calling a method when the corresponding struct field is not set will cause the call to panic.
-type SimpleRegistry struct {
-	// BoolFunc contains the implementation for the Registry.Bool function.
-	BoolFunc func(ctx context.Context, name string) bool
-
-	// FloatFunc contains the implementation for the Registry.Float function.
-	FloatFunc func(ctx context.Context, name string) float64
-
-	// IntFunc contains the implementation for the Registry.Int function.
-	IntFunc func(ctx context.Context, name string) int
-
-	// StringFunc contains the implementation for the Registry.String function.
-	StringFunc func(ctx context.Context, name string) string
-
-	// UintFunc contains the implementation for the Registry.Uint function.
-	UintFunc func(ctx context.Context, name string) uint
-}
-
-// Bool implements the [Registry] interface by calling s.BoolFunc and returning the result.
-func (s *SimpleRegistry) Bool(ctx context.Context, name string) bool {
-	return s.BoolFunc(ctx, name)
-}
-
-// Float implements the [Registry] interface by calling s.FloatFunc and returning the result.
-func (s *SimpleRegistry) Float(ctx context.Context, name string) float64 {
-	return s.FloatFunc(ctx, name)
-}
-
-// Int implements the [Registry] interface by calling s.IntFunc and returning the result.
-func (s *SimpleRegistry) Int(ctx context.Context, name string) int {
-	return s.IntFunc(ctx, name)
-}
-
-// String implements the [Registry] interface by calling s.StringFunc and returning the result.
-func (s *SimpleRegistry) String(ctx context.Context, name string) string {
-	return s.StringFunc(ctx, name)
-}
-
-// Uint implements the [Registry] interface by calling s.UintFunc and returning the result.
-func (s *SimpleRegistry) Uint(ctx context.Context, name string) uint {
-	return s.UintFunc(ctx, name)
 }

@@ -16,7 +16,7 @@ Currently, the supported methods are
 * [FlagSet.Float][2] for float flags,
 * [FlagSet.Int][3] for int flags and
 * [FlagSet.String][4] for string flags.
-* [FlagSet.Uint][8] for uint flags.
+* [FlagSet.Uint][5] for uint flags.
 
 Each method will return a callback that takes a `context.Context` and returns a value of the specific type.
 
@@ -46,15 +46,11 @@ func main() {
 
 ```
 
-### Configuring a registry
+### Context-specific values
 
-By default, the values returned for each flag will be the zero value for the specific type.
+By default, the values returned for each flag will be the default value specified when creating the flag.
 
-A [Registry][5] can be used to dynamically generate / fetch values for each flag.
-
-The package currently ships with a single implementation [SimpleStrategy][6].
-
-Once created, a registry can used by calling the [FlagSet.SetRegistry][7] method.
+The [FlagSet.Context][6] method can be used to set custom values for feature flags on a per-context basis.
 
 Example:
 
@@ -70,15 +66,13 @@ import (
 func main() {
 	var set feature.FlagSet
 
-	set.SetStrategy(&feature.SimpleStrategy{
-		BoolFunc: func(ctx context.Context, name string) bool {
-			return name == "my-feature"
-		},
-	})
-
 	myFeature := set.Bool("my-feature", false, flag.WithDescription("enables the new feature"))
 
-	if myFeature(context.Background()) {
+	// Enable the feature for our context
+	ctx := set.Context(context.Background(),
+		feature.BoolValue("my-feature", true))
+	
+	if myFeature(ctx) {
 		println("my-feature enabled")
 	}
 }
@@ -98,7 +92,5 @@ Please make sure to update tests as appropriate.
 [2]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Float
 [3]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Int
 [4]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.String
-[5]: https://pkg.go.dev/github.com/nussjustin/feature/#Registry
-[6]: https://pkg.go.dev/github.com/nussjustin/feature/#SimpleStrategy
-[7]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.SetRegistry
-[8]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Uint
+[5]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Uint
+[6]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Context
