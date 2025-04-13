@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"sync"
+	"sync/atomic"
 )
 
 // ErrDuplicateFlag is thrown by methods like [FlagSet.Bool] if a flag with a given name is already registered.
@@ -33,8 +34,8 @@ type Flag struct {
 //
 // The zero value is valid and returns zero values for all flags.
 type FlagSet struct {
-	flagsMu sync.Mutex
-	flags   sortedMap[Flag]
+	flagsMu sync.Mutex   // only used when writing to flags
+	flags   atomic.Value // of sortedMap[Flag]
 }
 
 // Labels is a read only map collection of labels associated with a feature flag.
@@ -86,9 +87,7 @@ const (
 
 // All yields all registered flags sorted by name.
 func (s *FlagSet) All(yield func(Flag) bool) {
-	s.flagsMu.Lock()
-	flags := s.flags
-	s.flagsMu.Unlock()
+	flags, _ := s.flags.Load().(sortedMap[Flag])
 
 	for _, key := range flags.keys {
 		if !yield(flags.m[key]) {
@@ -99,10 +98,9 @@ func (s *FlagSet) All(yield func(Flag) bool) {
 
 // Lookup returns the flag with the given name.
 func (s *FlagSet) Lookup(name string) (Flag, bool) {
-	s.flagsMu.Lock()
-	defer s.flagsMu.Unlock()
+	flags, _ := s.flags.Load().(sortedMap[Flag])
 
-	f, ok := s.flags.m[name]
+	f, ok := flags.m[name]
 	return f, ok
 }
 
@@ -116,9 +114,7 @@ func (s *FlagSet) Context(ctx context.Context, values ...Value) context.Context 
 		return ctx
 	}
 
-	s.flagsMu.Lock()
-	flags := s.flags
-	s.flagsMu.Unlock()
+	flags, _ := s.flags.Load().(sortedMap[Flag])
 
 	m, ok := ctx.Value((*valuesMapKey)(s)).(valuesMap)
 	if !ok {
@@ -179,11 +175,13 @@ func (s *FlagSet) add(name string, value any, fun any, opts ...Option) {
 	s.flagsMu.Lock()
 	defer s.flagsMu.Unlock()
 
-	if _, ok := s.flags.m[f.Name]; ok {
+	flags, _ := s.flags.Load().(sortedMap[Flag])
+
+	if _, ok := flags.m[f.Name]; ok {
 		panic(fmt.Errorf("%w: %s", ErrDuplicateFlag, f.Name))
 	}
 
-	s.flags = s.flags.add(f.Name, f)
+	s.flags.Store(flags.add(f.Name, f))
 }
 
 // BoolValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
