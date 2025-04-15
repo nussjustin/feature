@@ -9,6 +9,11 @@ import (
 	"sync/atomic"
 )
 
+type noCopy struct{}
+
+func (*noCopy) Lock()   {}
+func (*noCopy) Unlock() {}
+
 // ErrDuplicateFlag is thrown by methods like [FlagSet.Bool] if a flag with a given name is already registered.
 var ErrDuplicateFlag = errors.New("duplicate flag")
 
@@ -56,7 +61,11 @@ const (
 // FlagSet represents a set of defined feature flags.
 //
 // The zero value is valid and returns zero values for all flags.
+//
+// A FlagSet must not be copied and should instead be passed around via pointer.
 type FlagSet struct {
+	noCopy noCopy
+
 	flagsMu sync.Mutex   // only used when writing to flags
 	flags   atomic.Value // of sortedMap[Flag]
 }
@@ -117,7 +126,7 @@ func (s *FlagSet) Lookup(name string) (Flag, bool) {
 	return f, ok
 }
 
-// Context returns a new context based on ctx which will use the given values when checking feature flags.
+// Context returns a new context based on ctx which will use the given values when checking feature flags of this set.
 //
 // If a values type does not match the flags type, Context will panic.
 //
