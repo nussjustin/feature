@@ -36,7 +36,7 @@ import (
 func main() {
 	var set feature.FlagSet
 
-	myFeature := set.Bool("my-feature", false, flag.WithDescription("enables the new feature"))
+	myFeature := set.Bool("my-feature", false, "some new feature")
 
 	if myFeature(context.Background()) {
 		println("my-feature enabled") // never runs, see next section
@@ -66,7 +66,7 @@ import (
 func main() {
 	var set feature.FlagSet
 
-	myFeature := set.Bool("my-feature", false, flag.WithDescription("enables the new feature"))
+	myFeature := set.Bool("my-feature", false, "some new feature")
 
 	// Enable the feature for our context
 	ctx := set.Context(context.Background(),

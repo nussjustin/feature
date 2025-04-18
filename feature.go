@@ -30,9 +30,6 @@ type Flag struct {
 
 	// Description is an optional description specified using [WithDescription].
 	Description string
-
-	// Labels contains the labels specified via [WithLabels].
-	Labels Labels
 }
 
 // FlagKind is an enum of potential flag kinds.
@@ -68,25 +65,6 @@ type FlagSet struct {
 
 	flagsMu sync.Mutex   // only used when writing to flags
 	flags   atomic.Value // of sortedMap[Flag]
-}
-
-// Labels is a read only map collection of labels associated with a feature flag.
-type Labels struct {
-	m sortedMap[string]
-}
-
-// All yields all labels.
-func (l *Labels) All(yield func(string, string) bool) {
-	for _, key := range l.m.keys {
-		if !yield(key, l.m.m[key]) {
-			return
-		}
-	}
-}
-
-// Len returns the number of labels.
-func (l *Labels) Len() int {
-	return len(l.m.keys)
 }
 
 // Value specifies a custom value for a feature flag, which can be assigned to a [context.Context].
@@ -173,11 +151,8 @@ func (s *FlagSet) value(ctx context.Context, name string, kind FlagKind) (Value,
 	return v, true
 }
 
-func (s *FlagSet) add(kind FlagKind, name string, value any, opts ...Option) {
-	f := Flag{Kind: kind, Name: name, Value: value}
-	for _, opt := range opts {
-		opt(&f)
-	}
+func (s *FlagSet) add(kind FlagKind, name string, value any, desc string) {
+	f := Flag{Kind: kind, Name: name, Value: value, Description: desc}
 
 	s.flagsMu.Lock()
 	defer s.flagsMu.Unlock()
@@ -199,7 +174,7 @@ func BoolValue(name string, value bool) Value {
 // Bool registers a new flag that represents a boolean value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Bool(name string, value bool, opts ...Option) func(context.Context) bool {
+func (s *FlagSet) Bool(name string, value bool, desc string) func(context.Context) bool {
 	f := func(ctx context.Context) bool {
 		v, ok := s.value(ctx, name, FlagKindBool)
 		if ok {
@@ -208,7 +183,7 @@ func (s *FlagSet) Bool(name string, value bool, opts ...Option) func(context.Con
 		return value
 	}
 
-	s.add(FlagKindBool, name, value, opts...)
+	s.add(FlagKindBool, name, value, desc)
 
 	return f
 }
@@ -221,7 +196,7 @@ func FloatValue(name string, value float64) Value {
 // Float registers a new flag that represents a float value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Float(name string, value float64, opts ...Option) func(context.Context) float64 {
+func (s *FlagSet) Float(name string, value float64, desc string) func(context.Context) float64 {
 	f := func(ctx context.Context) float64 {
 		v, ok := s.value(ctx, name, FlagKindFloat)
 		if ok {
@@ -230,7 +205,7 @@ func (s *FlagSet) Float(name string, value float64, opts ...Option) func(context
 		return value
 	}
 
-	s.add(FlagKindFloat, name, value, opts...)
+	s.add(FlagKindFloat, name, value, desc)
 
 	return f
 }
@@ -243,7 +218,7 @@ func IntValue(name string, value int) Value {
 // Int registers a new flag that represents an int value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Int(name string, value int, opts ...Option) func(context.Context) int {
+func (s *FlagSet) Int(name string, value int, desc string) func(context.Context) int {
 	f := func(ctx context.Context) int {
 		v, ok := s.value(ctx, name, FlagKindInt)
 		if ok {
@@ -252,7 +227,7 @@ func (s *FlagSet) Int(name string, value int, opts ...Option) func(context.Conte
 		return value
 	}
 
-	s.add(FlagKindInt, name, value, opts...)
+	s.add(FlagKindInt, name, value, desc)
 
 	return f
 }
@@ -265,7 +240,7 @@ func StringValue(name string, value string) Value {
 // String registers a new flag that represents a string value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) String(name string, value string, opts ...Option) func(context.Context) string {
+func (s *FlagSet) String(name string, value string, desc string) func(context.Context) string {
 	f := func(ctx context.Context) string {
 		v, ok := s.value(ctx, name, FlagKindString)
 		if ok {
@@ -274,7 +249,7 @@ func (s *FlagSet) String(name string, value string, opts ...Option) func(context
 		return value
 	}
 
-	s.add(FlagKindString, name, value, opts...)
+	s.add(FlagKindString, name, value, desc)
 
 	return f
 }
@@ -287,7 +262,7 @@ func UintValue(name string, value uint) Value {
 // Uint registers a new flag that represents an uint value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Uint(name string, value uint, opts ...Option) func(context.Context) uint {
+func (s *FlagSet) Uint(name string, value uint, desc string) func(context.Context) uint {
 	f := func(ctx context.Context) uint {
 		v, ok := s.value(ctx, name, FlagKindUint)
 		if ok {
@@ -296,35 +271,7 @@ func (s *FlagSet) Uint(name string, value uint, opts ...Option) func(context.Con
 		return value
 	}
 
-	s.add(FlagKindUint, name, value, opts...)
+	s.add(FlagKindUint, name, value, desc)
 
 	return f
-}
-
-// Option defines options for new flags which can be passed to [Register].
-type Option func(*Flag)
-
-// WithDescription sets the description for a flag.
-//
-// if given multiple times, only the last value is used.
-func WithDescription(desc string) Option {
-	return func(f *Flag) {
-		f.Description = desc
-	}
-}
-
-// WithLabel adds a label to a flag.
-func WithLabel(key, value string) Option {
-	return func(f *Flag) {
-		f.Labels.m = f.Labels.m.add(key, value)
-	}
-}
-
-// WithLabels adds labels to a flag.
-//
-// If used multiple times, the maps will be merged with later values replacing prior ones.
-func WithLabels(labels map[string]string) Option {
-	return func(f *Flag) {
-		f.Labels.m = f.Labels.m.addMany(labels)
-	}
 }

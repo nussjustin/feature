@@ -2,6 +2,7 @@ package feature_test
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -12,25 +13,15 @@ import (
 func TestFlagSet_All(t *testing.T) {
 	var set feature.FlagSet
 
-	set.Int("int", 0,
-		feature.WithDescription("int value"),
-		feature.WithLabel("type", "int"))
+	set.Int("int", 0, "int value")
 
-	set.Bool("bool", false,
-		feature.WithDescription("bool value"),
-		feature.WithLabel("type", "bool"))
+	set.Bool("bool", false, "bool value")
 
-	set.String("string", "",
-		feature.WithDescription("string value"),
-		feature.WithLabel("type", "string"))
+	set.String("string", "", "string value")
 
-	set.Float("float", 0.0,
-		feature.WithDescription("float value"),
-		feature.WithLabel("type", "float"))
+	set.Float("float", 0.0, "float value")
 
-	set.Uint("uint", 0,
-		feature.WithDescription("uint value"),
-		feature.WithLabel("type", "uint"))
+	set.Uint("uint", 0, "uint value")
 
 	want := make([]feature.Flag, 5)
 	want[0], _ = set.Lookup("bool")
@@ -39,14 +30,14 @@ func TestFlagSet_All(t *testing.T) {
 	want[3], _ = set.Lookup("string")
 	want[4], _ = set.Lookup("uint")
 
-	assertEquals(t, want, slicesCollect(set.All), "")
+	assertEquals(t, want, slices.Collect(set.All), "")
 }
 
 func TestFlagSet_Lookup(t *testing.T) {
 	var set feature.FlagSet
 
-	set.Bool("flagA", false)
-	set.String("flagB", "test", feature.WithDescription("description"))
+	set.Bool("flagA", false, "")
+	set.String("flagB", "test", "description")
 
 	flagA, okA := set.Lookup("flagA")
 	assertEquals(t, feature.FlagKindBool, flagA.Kind, "flagA kind mismatch")
@@ -79,7 +70,7 @@ func TestFlagSet_Context(t *testing.T) {
 
 	t.Run("Panics on wrong type", func(t *testing.T) {
 		var set feature.FlagSet
-		set.Int("test", 5)
+		set.Int("test", 5, "test flag")
 
 		assertPanicErrorString(t, `invalid value kind for flag "test"`, func() {
 			set.Context(t.Context(), feature.StringValue("test", "value"))
@@ -90,10 +81,10 @@ func TestFlagSet_Context(t *testing.T) {
 func TestFlagSet_Bool(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.String("test", "")
+		set.String("test", "", "test flag")
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			set.Bool("test", false)
+			set.Bool("test", false, "test flag")
 		})
 	})
 
@@ -101,7 +92,7 @@ func TestFlagSet_Bool(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.Bool("test", false)
+		v := set.Bool("test", false, "test flag")
 
 		assertEquals(t, false, v(ctx), "")
 	})
@@ -110,8 +101,8 @@ func TestFlagSet_Bool(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v1 := set.Bool("test1", false)
-		v2 := set.Bool("test2", true)
+		v1 := set.Bool("test1", false, "test flag")
+		v2 := set.Bool("test2", true, "test flag")
 
 		ctx = set.Context(ctx,
 			feature.BoolValue("test1", true),
@@ -130,10 +121,10 @@ func TestFlagSet_Bool(t *testing.T) {
 func TestFlagSet_Float(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.Bool("test", false)
+		set.Bool("test", false, "test flag")
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			set.Float("test", 0.0)
+			set.Float("test", 0.0, "test flag")
 		})
 	})
 
@@ -141,7 +132,7 @@ func TestFlagSet_Float(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.Float("test", 5.0)
+		v := set.Float("test", 5.0, "test flag")
 
 		assertEquals(t, 5.0, v(ctx), "")
 	})
@@ -150,8 +141,8 @@ func TestFlagSet_Float(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v1 := set.Float("test1", 5.0)
-		v2 := set.Float("test2", 10.0)
+		v1 := set.Float("test1", 5.0, "test flag")
+		v2 := set.Float("test2", 10.0, "test flag")
 
 		ctx = set.Context(ctx,
 			feature.FloatValue("test1", 15.0),
@@ -170,10 +161,10 @@ func TestFlagSet_Float(t *testing.T) {
 func TestFlagSet_Int(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.Float("test", 0.0)
+		set.Float("test", 0.0, "test flag")
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			set.Int("test", 0)
+			set.Int("test", 0, "test flag")
 		})
 	})
 
@@ -181,7 +172,7 @@ func TestFlagSet_Int(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.Int("test", 5)
+		v := set.Int("test", 5, "test flag")
 
 		assertEquals(t, 5, v(ctx), "")
 	})
@@ -190,8 +181,8 @@ func TestFlagSet_Int(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v1 := set.Int("test1", 5)
-		v2 := set.Int("test2", 10)
+		v1 := set.Int("test1", 5, "test flag")
+		v2 := set.Int("test2", 10, "test flag")
 
 		ctx = set.Context(ctx,
 			feature.IntValue("test1", 15),
@@ -210,10 +201,10 @@ func TestFlagSet_Int(t *testing.T) {
 func TestFlagSet_String(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.Int("test", 0)
+		set.Int("test", 0, "test flag")
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			set.String("test", "")
+			set.String("test", "", "test flag")
 		})
 	})
 
@@ -221,7 +212,7 @@ func TestFlagSet_String(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.String("test", "default")
+		v := set.String("test", "default", "test flag")
 
 		assertEquals(t, "default", v(ctx), "")
 	})
@@ -230,8 +221,8 @@ func TestFlagSet_String(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v1 := set.String("test1", "test1")
-		v2 := set.String("test2", "test2")
+		v1 := set.String("test1", "test1", "test flag")
+		v2 := set.String("test2", "test2", "test flag")
 
 		ctx = set.Context(ctx,
 			feature.StringValue("test1", "test1 changed"),
@@ -250,10 +241,10 @@ func TestFlagSet_String(t *testing.T) {
 func TestFlagSet_Uint(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.Float("test", 0.0)
+		set.Float("test", 0.0, "test flag")
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			set.Uint("test", 0)
+			set.Uint("test", 0, "test flag")
 		})
 	})
 
@@ -261,7 +252,7 @@ func TestFlagSet_Uint(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.Uint("test", 5)
+		v := set.Uint("test", 5, "test flag")
 
 		assertEquals(t, 5, v(ctx), "")
 	})
@@ -270,8 +261,8 @@ func TestFlagSet_Uint(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v1 := set.Uint("test1", 5)
-		v2 := set.Uint("test2", 10)
+		v1 := set.Uint("test1", 5, "test flag")
+		v2 := set.Uint("test2", 10, "test flag")
 
 		ctx = set.Context(ctx,
 			feature.UintValue("test1", 15),
@@ -287,48 +278,10 @@ func TestFlagSet_Uint(t *testing.T) {
 	})
 }
 
-func TestLabels(t *testing.T) {
-	var s feature.FlagSet
-
-	s.Bool("test", false,
-		feature.WithLabel("labelC", "C"),
-		feature.WithLabel("labelB", "B"),
-		feature.WithLabel("labelE", "E"),
-		feature.WithLabels(map[string]string{
-			"labelA": "A",
-			"labelE": "E2",
-			"labelF": "F",
-			"labelD": "D",
-		}))
-
-	f := mustLookup(t, &s, "test")
-
-	keys := make([]string, 0, f.Labels.Len())
-	labels := make(map[string]string, f.Labels.Len())
-
-	f.Labels.All(func(key string, value string) bool {
-		keys = append(keys, key)
-		labels[key] = value
-		return true
-	})
-
-	assertEquals(t, 6, len(keys), "unexpected number of labels")
-	assertEquals(t, []string{"labelA", "labelB", "labelC", "labelD", "labelE", "labelF"}, keys, "labels not sorted")
-	assertEquals(t, map[string]string{
-		"labelA": "A",
-		"labelB": "B",
-		"labelC": "C",
-		"labelD": "D",
-		"labelE": "E2",
-		"labelF": "F",
-	}, labels, "labels do not match")
-	assertEquals(t, 6, f.Labels.Len(), "wrong number of labels reported")
-}
-
 func BenchmarkFlagSet_Bool(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.Bool("test", false)
+		flag := set.Bool("test", false, "test flag")
 		ctx := set.Context(b.Context(), feature.BoolValue("test", true))
 
 		b.ReportAllocs()
@@ -340,7 +293,7 @@ func BenchmarkFlagSet_Bool(b *testing.B) {
 
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.Bool("test", false)
+		flag := set.Bool("test", false, "test flag")
 		ctx := set.Context(b.Context(), feature.BoolValue("unused", false))
 
 		b.ReportAllocs()
@@ -354,7 +307,7 @@ func BenchmarkFlagSet_Bool(b *testing.B) {
 func BenchmarkFlagSet_Float(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.Float("test", 5.0)
+		flag := set.Float("test", 5.0, "test flag")
 		ctx := set.Context(b.Context(), feature.FloatValue("test", 5.0))
 
 		b.ReportAllocs()
@@ -366,7 +319,7 @@ func BenchmarkFlagSet_Float(b *testing.B) {
 
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.Float("test", 5.0)
+		flag := set.Float("test", 5.0, "test flag")
 		ctx := set.Context(b.Context(), feature.FloatValue("unused", 0.0))
 
 		b.ReportAllocs()
@@ -380,7 +333,7 @@ func BenchmarkFlagSet_Float(b *testing.B) {
 func BenchmarkFlagSet_Int(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.Int("test", 5.0)
+		flag := set.Int("test", 5.0, "test flag")
 		ctx := set.Context(b.Context(), feature.IntValue("test", 5))
 
 		b.ReportAllocs()
@@ -392,7 +345,7 @@ func BenchmarkFlagSet_Int(b *testing.B) {
 
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.Int("test", 5.0)
+		flag := set.Int("test", 5.0, "test flag")
 		ctx := set.Context(b.Context(), feature.IntValue("unused", 0))
 
 		b.ReportAllocs()
@@ -406,7 +359,7 @@ func BenchmarkFlagSet_Int(b *testing.B) {
 func BenchmarkFlagSet_String(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.String("test", "test")
+		flag := set.String("test", "test", "test flag")
 		ctx := set.Context(b.Context(), feature.StringValue("test", "test"))
 
 		b.ReportAllocs()
@@ -418,7 +371,7 @@ func BenchmarkFlagSet_String(b *testing.B) {
 
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.String("test", "test")
+		flag := set.String("test", "test", "test flag")
 		ctx := set.Context(b.Context(), feature.StringValue("unused", ""))
 
 		b.ReportAllocs()
@@ -432,7 +385,7 @@ func BenchmarkFlagSet_String(b *testing.B) {
 func BenchmarkFlagSet_Uint(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.Uint("test", 5)
+		flag := set.Uint("test", 5, "test flag")
 		ctx := set.Context(b.Context(), feature.UintValue("test", 5))
 
 		b.ReportAllocs()
@@ -444,7 +397,7 @@ func BenchmarkFlagSet_Uint(b *testing.B) {
 
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.Uint("test", 5)
+		flag := set.Uint("test", 5, "test flag")
 		ctx := set.Context(b.Context(), feature.UintValue("unused", 0))
 
 		b.ReportAllocs()
@@ -462,15 +415,11 @@ func assertEquals[T any](tb testing.TB, want, got T, msg string) {
 		msg = "result mismatch"
 	}
 
-	labelsComparer := cmp.Comparer(func(x, y feature.Labels) bool {
-		return cmp.Equal(mapsCollect(x.All), mapsCollect(y.All))
-	})
-
 	flagComparer := cmp.Comparer(func(x, y feature.Flag) bool {
-		return x.Name == y.Name && x.Description == y.Description && cmp.Equal(x.Labels, y.Labels, labelsComparer)
+		return x.Name == y.Name && x.Description == y.Description && x.Value == y.Value
 	})
 
-	if diff := cmp.Diff(want, got, flagComparer, labelsComparer); diff != "" {
+	if diff := cmp.Diff(want, got, flagComparer); diff != "" {
 		tb.Errorf("%s (-want +got):\n%s", msg, diff)
 	}
 }
@@ -517,40 +466,4 @@ func assertPanicErrorString(tb testing.TB, want string, f func()) {
 	}()
 
 	f()
-}
-
-func mustLookup(tb testing.TB, set *feature.FlagSet, name string) feature.Flag {
-	tb.Helper()
-
-	f, ok := set.Lookup(name)
-	if !ok {
-		tb.Fatalf("flag %q not found", name)
-	}
-
-	return f
-}
-
-type (
-	iterSeq[V any]     func(yield func(V) bool)
-	iterSeq2[K, V any] func(yield func(K, V) bool)
-)
-
-func mapsCollect[K comparable, V any](seq iterSeq2[K, V]) map[K]V {
-	m := make(map[K]V)
-
-	seq(func(k K, v V) bool {
-		m[k] = v
-		return true
-	})
-
-	return m
-}
-
-func slicesCollect[E any](seq iterSeq[E]) []E {
-	var s []E
-	seq(func(e E) bool {
-		s = append(s, e)
-		return true
-	})
-	return s
 }
