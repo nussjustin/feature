@@ -12,11 +12,11 @@ Flags are created using a specific method based on the type of the value of the 
 
 Currently, the supported methods are
 
-* [FlagSet.Bool][1] for boolean flags,
-* [FlagSet.Float][2] for float flags,
-* [FlagSet.Int][3] for int flags and
-* [FlagSet.String][4] for string flags.
-* [FlagSet.Uint][5] for uint flags.
+* [FlagSet.Bool][1] for boolean flags
+* [FlagSet.Float][2] for float flags
+* [FlagSet.Int][3] for int flags
+* [FlagSet.String][4] for string flags
+* [FlagSet.Uint][5] for uint flags
 
 Each method will return a callback that takes a `context.Context` and returns a value of the specific type.
 
