@@ -45,8 +45,8 @@ const (
 	// FlagKindInt denotes a boolean flag created using [FlagSet.Int].
 	FlagKindInt
 
-	// FlagKindFloat denotes a boolean flag created using [FlagSet.Float].
-	FlagKindFloat
+	// FlagKindFloat64 denotes a boolean flag created using [FlagSet.Float64].
+	FlagKindFloat64
 
 	// FlagKindString denotes a boolean flag created using [FlagSet.String].
 	FlagKindString
@@ -69,7 +69,7 @@ type FlagSet struct {
 
 // Value specifies a custom value for a feature flag, which can be assigned to a [context.Context].
 //
-// A Value must be created using one of [BoolValue], [FloatValue], [IntValue], [StringValue] or [UintValue].
+// A Value must be created using one of [BoolValue], [Float64Value], [IntValue], [StringValue] or [UintValue].
 type Value struct {
 	name string
 
@@ -188,24 +188,24 @@ func (s *FlagSet) Bool(name string, value bool, desc string) func(context.Contex
 	return f
 }
 
-// FloatValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
-func FloatValue(name string, value float64) Value {
-	return Value{name: name, kind: FlagKindFloat, float: value}
+// Float64Value returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
+func Float64Value(name string, value float64) Value {
+	return Value{name: name, kind: FlagKindFloat64, float: value}
 }
 
-// Float registers a new flag that represents a float value.
+// Float64 registers a new flag that represents a float value.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Float(name string, value float64, desc string) func(context.Context) float64 {
+func (s *FlagSet) Float64(name string, value float64, desc string) func(context.Context) float64 {
 	f := func(ctx context.Context) float64 {
-		v, ok := s.value(ctx, name, FlagKindFloat)
+		v, ok := s.value(ctx, name, FlagKindFloat64)
 		if ok {
 			return v.float
 		}
 		return value
 	}
 
-	s.add(FlagKindFloat, name, value, desc)
+	s.add(FlagKindFloat64, name, value, desc)
 
 	return f
 }

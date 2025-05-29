@@ -13,7 +13,7 @@ Flags are created using a specific method based on the type of the value of the 
 Currently, the supported methods are
 
 * [FlagSet.Bool][1] for boolean flags
-* [FlagSet.Float][2] for float flags
+* [FlagSet.Float64][2] for float flags
 * [FlagSet.Int][3] for int flags
 * [FlagSet.String][4] for string flags
 * [FlagSet.Uint][5] for uint flags
@@ -89,7 +89,7 @@ Please make sure to update tests as appropriate.
 
 [0]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet
 [1]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Bool
-[2]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Float
+[2]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Float64
 [3]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Int
 [4]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.String
 [5]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Uint

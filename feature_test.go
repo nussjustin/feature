@@ -19,7 +19,7 @@ func TestFlagSet_All(t *testing.T) {
 
 	set.String("string", "", "string value")
 
-	set.Float("float", 0.0, "float value")
+	set.Float64("float", 0.0, "float value")
 
 	set.Uint("uint", 0, "uint value")
 
@@ -124,7 +124,7 @@ func TestFlagSet_Float(t *testing.T) {
 		set.Bool("test", false, "test flag")
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			set.Float("test", 0.0, "test flag")
+			set.Float64("test", 0.0, "test flag")
 		})
 	})
 
@@ -132,7 +132,7 @@ func TestFlagSet_Float(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.Float("test", 5.0, "test flag")
+		v := set.Float64("test", 5.0, "test flag")
 
 		assertEquals(t, 5.0, v(ctx), "")
 	})
@@ -141,17 +141,17 @@ func TestFlagSet_Float(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v1 := set.Float("test1", 5.0, "test flag")
-		v2 := set.Float("test2", 10.0, "test flag")
+		v1 := set.Float64("test1", 5.0, "test flag")
+		v2 := set.Float64("test2", 10.0, "test flag")
 
 		ctx = set.Context(ctx,
-			feature.FloatValue("test1", 15.0),
-			feature.FloatValue("test2", 20.0))
+			feature.Float64Value("test1", 15.0),
+			feature.Float64Value("test2", 20.0))
 
 		var otherSet feature.FlagSet
 		ctx = otherSet.Context(ctx,
-			feature.FloatValue("test1", 25.0),
-			feature.FloatValue("test2", 30.0))
+			feature.Float64Value("test1", 25.0),
+			feature.Float64Value("test2", 30.0))
 
 		assertEquals(t, 15.0, v1(ctx), "")
 		assertEquals(t, 20.0, v2(ctx), "")
@@ -161,7 +161,7 @@ func TestFlagSet_Float(t *testing.T) {
 func TestFlagSet_Int(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.Float("test", 0.0, "test flag")
+		set.Float64("test", 0.0, "test flag")
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
 			set.Int("test", 0, "test flag")
@@ -241,7 +241,7 @@ func TestFlagSet_String(t *testing.T) {
 func TestFlagSet_Uint(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
-		set.Float("test", 0.0, "test flag")
+		set.Float64("test", 0.0, "test flag")
 
 		assertPanic(t, feature.ErrDuplicateFlag, func() {
 			set.Uint("test", 0, "test flag")
@@ -307,8 +307,8 @@ func BenchmarkFlagSet_Bool(b *testing.B) {
 func BenchmarkFlagSet_Float(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.Float("test", 5.0, "test flag")
-		ctx := set.Context(b.Context(), feature.FloatValue("test", 5.0))
+		flag := set.Float64("test", 5.0, "test flag")
+		ctx := set.Context(b.Context(), feature.Float64Value("test", 5.0))
 
 		b.ReportAllocs()
 
@@ -319,8 +319,8 @@ func BenchmarkFlagSet_Float(b *testing.B) {
 
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
-		flag := set.Float("test", 5.0, "test flag")
-		ctx := set.Context(b.Context(), feature.FloatValue("unused", 0.0))
+		flag := set.Float64("test", 5.0, "test flag")
+		ctx := set.Context(b.Context(), feature.Float64Value("unused", 0.0))
 
 		b.ReportAllocs()
 
