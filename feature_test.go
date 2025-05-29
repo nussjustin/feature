@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -23,12 +24,15 @@ func TestFlagSet_All(t *testing.T) {
 
 	set.Uint("uint", 0, "uint value")
 
-	want := make([]feature.Flag, 5)
+	set.Duration("duration", 0, "duration value")
+
+	want := make([]feature.Flag, 6)
 	want[0], _ = set.Lookup("bool")
-	want[1], _ = set.Lookup("float")
-	want[2], _ = set.Lookup("int")
-	want[3], _ = set.Lookup("string")
-	want[4], _ = set.Lookup("uint")
+	want[1], _ = set.Lookup("duration")
+	want[2], _ = set.Lookup("float")
+	want[3], _ = set.Lookup("int")
+	want[4], _ = set.Lookup("string")
+	want[5], _ = set.Lookup("uint")
 
 	assertEquals(t, want, slices.Collect(set.All), "")
 }
@@ -115,6 +119,46 @@ func TestFlagSet_Bool(t *testing.T) {
 
 		assertEquals(t, true, v1(ctx), "")
 		assertEquals(t, false, v2(ctx), "")
+	})
+}
+
+func TestFlagSet_Duration(t *testing.T) {
+	t.Run("Duplicate", func(t *testing.T) {
+		var set feature.FlagSet
+		set.Float64("test", 0.0, "test flag")
+
+		assertPanic(t, feature.ErrDuplicateFlag, func() {
+			set.Duration("test", 0, "test flag")
+		})
+	})
+
+	t.Run("Default", func(t *testing.T) {
+		ctx := t.Context()
+
+		var set feature.FlagSet
+		v := set.Duration("test", 5, "test flag")
+
+		assertEquals(t, 5, v(ctx), "")
+	})
+
+	t.Run("Value", func(t *testing.T) {
+		ctx := t.Context()
+
+		var set feature.FlagSet
+		v1 := set.Duration("test1", 5*time.Second, "test flag")
+		v2 := set.Duration("test2", 10*time.Second, "test flag")
+
+		ctx = set.Context(ctx,
+			feature.DurationValue("test1", 15*time.Second),
+			feature.DurationValue("test2", 20*time.Second))
+
+		var otherSet feature.FlagSet
+		ctx = otherSet.Context(ctx,
+			feature.DurationValue("test1", 25*time.Second),
+			feature.DurationValue("test2", 30*time.Second))
+
+		assertEquals(t, 15*time.Second, v1(ctx), "")
+		assertEquals(t, 20*time.Second, v2(ctx), "")
 	})
 }
 

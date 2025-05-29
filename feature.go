@@ -7,6 +7,7 @@ import (
 	"maps"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type noCopy struct{}
@@ -39,19 +40,22 @@ const (
 	// FlagKindInvalid is the zero value of FlagKind and is not considered valid value.
 	FlagKindInvalid FlagKind = iota
 
-	// FlagKindBool denotes a boolean flag created using [FlagSet.Bool].
+	// FlagKindBool is used for flags created via [FlagSet.Bool].
 	FlagKindBool
 
-	// FlagKindInt denotes a boolean flag created using [FlagSet.Int].
+	// FlagKindDuration is used for flags created via [FlagSet.Bool].
+	FlagKindDuration
+
+	// FlagKindInt is used for flags created via [FlagSet.Int].
 	FlagKindInt
 
-	// FlagKindFloat64 denotes a boolean flag created using [FlagSet.Float64].
+	// FlagKindFloat64 is used for flags created via [FlagSet.Float64].
 	FlagKindFloat64
 
-	// FlagKindString denotes a boolean flag created using [FlagSet.String].
+	// FlagKindString is used for flags created via [FlagSet.String].
 	FlagKindString
 
-	// FlagKindUint denotes a boolean flag created using [FlagSet.Uint].
+	// FlagKindUint is used for flags created via [FlagSet.Uint].
 	FlagKindUint
 )
 
@@ -69,16 +73,18 @@ type FlagSet struct {
 
 // Value specifies a custom value for a feature flag, which can be assigned to a [context.Context].
 //
-// A Value must be created using one of [BoolValue], [Float64Value], [IntValue], [StringValue] or [UintValue].
+// A Value must be created using one of [BoolValue], [DurationValue], [Float64Value], [IntValue], [StringValue] or
+// [UintValue].
 type Value struct {
 	name string
 
-	kind   FlagKind
-	bool   bool
-	int    int
-	float  float64
-	string string
-	uint   uint
+	kind     FlagKind
+	bool     bool
+	duration time.Duration
+	int      int
+	float    float64
+	string   string
+	uint     uint
 }
 
 type valuesMap map[string]Value
@@ -184,6 +190,28 @@ func (s *FlagSet) Bool(name string, value bool, desc string) func(context.Contex
 	}
 
 	s.add(FlagKindBool, name, value, desc)
+
+	return f
+}
+
+// DurationValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
+func DurationValue(name string, value time.Duration) Value {
+	return Value{name: name, kind: FlagKindDuration, duration: value}
+}
+
+// Duration registers a new flag that represents a [time.Duration] value.
+//
+// If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
+func (s *FlagSet) Duration(name string, value time.Duration, desc string) func(context.Context) time.Duration {
+	f := func(ctx context.Context) time.Duration {
+		v, ok := s.value(ctx, name, FlagKindDuration)
+		if ok {
+			return v.duration
+		}
+		return value
+	}
+
+	s.add(FlagKindDuration, name, value, desc)
 
 	return f
 }
