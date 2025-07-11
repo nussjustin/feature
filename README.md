@@ -12,16 +12,14 @@ Flags are created using a specific method based on the type of the value of the 
 
 Currently, the supported methods are
 
-* [FlagSet.Bool][1] for boolean flags
-* [FlagSet.Duration][7] for flags containing `time.Duration` values
-* [FlagSet.Float64][2] for float flags
-* [FlagSet.Int][3] for int flags
-* [FlagSet.String][4] for string flags
-* [FlagSet.Uint][5] for uint flags
+* [FlagSet.Bool][1] and [FlagSet.BoolFunc][8] for boolean flags,
+* [FlagSet.Duration][7] and [FlagSet.DurationFunc][9] for duration flags,
+* [FlagSet.Float64][2] and [FlagSet.Float64Func][10] for float flags,
+* [FlagSet.Int][3] and [FlagSet.IntFunc][11] for int flags,
+* [FlagSet.String][4] and [FlagSet.StringFunc][12] for string flags,
+* [FlagSet.Uint][5] and [FlagSet.UintFunc][13] for uint flags.
 
 Each method will return a callback that takes a `context.Context` and returns a value of the specific type.
-
-Additionally, each method can take an arbitrary number of options for adding metadata to the flag.
 
 For example:
 
@@ -37,7 +35,7 @@ import (
 func main() {
 	var set feature.FlagSet
 
-	myFeature := set.Bool("my-feature", false, "some new feature")
+	myFeature := set.Bool("my-feature", "some new feature", false)
 
 	if myFeature(context.Background()) {
 		println("my-feature enabled") // never runs, see next section
@@ -67,7 +65,7 @@ import (
 func main() {
 	var set feature.FlagSet
 
-	myFeature := set.Bool("my-feature", false, "some new feature")
+	myFeature := set.Bool("my-feature", "some new feature", false)
 
 	// Enable the feature for our context
 	ctx := set.Context(context.Background(),
@@ -96,3 +94,9 @@ Please make sure to update tests as appropriate.
 [5]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Uint
 [6]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Context
 [7]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Duration
+[8]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.BoolFunc
+[9]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.DurationFunc
+[10]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Float64Func
+[11]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.IntFunc
+[12]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.StringFunc
+[13]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.UintFunc

@@ -35,7 +35,6 @@ linters:
     - ineffassign
     - interfacebloat
     - intrange
-    - lll
     - loggercheck
     - makezero
     - mirror
