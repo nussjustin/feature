@@ -375,3 +375,23 @@ func (s *FlagSet) UintFunc(name string, desc string, valueFn func(context.Contex
 
 	return f
 }
+
+// Typed registers a new flag that represents a value of type T.
+//
+// If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
+func Typed[T any](s *FlagSet, name string, desc string, value T) func(context.Context) T {
+	return TypedFunc(s, name, desc, func(context.Context) T { return value })
+}
+
+// TypedFunc registers a new flag that represents a value of type T value produced by calling the given function.
+//
+// If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
+func TypedFunc[T any](s *FlagSet, name string, desc string, value func(context.Context) T) func(context.Context) T {
+	f := s.AnyFunc(name, desc, func(ctx context.Context) any {
+		return value(ctx)
+	})
+
+	return func(ctx context.Context) T {
+		return f(ctx).(T)
+	}
+}
