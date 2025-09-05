@@ -41,8 +41,31 @@ func main() {
 		println("my-feature enabled") // never runs, see next section
 	}
 }
+```
 
+It is also possible to register a flag with a callback that is used to determine the flag value dynamically:
 
+```go
+package main
+
+import (
+	"context"
+
+	"github.com/nussjustin/feature"
+)
+
+func main() {
+	var set feature.FlagSet
+
+	myFeature := set.BoolFunc("my-feature", "some new feature", func(ctx context.Context) bool {
+		// ... do something with ctx ...
+		return false
+	})
+
+	if myFeature(context.Background()) {
+		println("my-feature enabled") // never runs, see next section
+	}
+}
 ```
 
 ### Context-specific values
