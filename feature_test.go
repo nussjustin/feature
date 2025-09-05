@@ -15,6 +15,11 @@ import (
 func TestFlagSet_All(t *testing.T) {
 	var set feature.FlagSet
 
+	set.Any("any", "any value", nil)
+	set.AnyFunc("any-func", "any value", func(context.Context) any {
+		return nil
+	})
+
 	set.Bool("bool", "bool value", false)
 	set.BoolFunc("bool-func", "bool value", func(context.Context) bool {
 		return false
@@ -45,19 +50,21 @@ func TestFlagSet_All(t *testing.T) {
 		return 0
 	})
 
-	want := make([]feature.Flag, 12)
-	want[0], _ = set.Lookup("bool")
-	want[1], _ = set.Lookup("bool-func")
-	want[2], _ = set.Lookup("duration")
-	want[3], _ = set.Lookup("duration-func")
-	want[4], _ = set.Lookup("float64")
-	want[5], _ = set.Lookup("float64-func")
-	want[6], _ = set.Lookup("int")
-	want[7], _ = set.Lookup("int-func")
-	want[8], _ = set.Lookup("string")
-	want[9], _ = set.Lookup("string-func")
-	want[10], _ = set.Lookup("uint")
-	want[11], _ = set.Lookup("uint-func")
+	want := make([]feature.Flag, 14)
+	want[0], _ = set.Lookup("any")
+	want[1], _ = set.Lookup("any-func")
+	want[2], _ = set.Lookup("bool")
+	want[3], _ = set.Lookup("bool-func")
+	want[4], _ = set.Lookup("duration")
+	want[5], _ = set.Lookup("duration-func")
+	want[6], _ = set.Lookup("float64")
+	want[7], _ = set.Lookup("float64-func")
+	want[8], _ = set.Lookup("int")
+	want[9], _ = set.Lookup("int-func")
+	want[10], _ = set.Lookup("string")
+	want[11], _ = set.Lookup("string-func")
+	want[12], _ = set.Lookup("uint")
+	want[13], _ = set.Lookup("uint-func")
 
 	assertEquals(t, want, slices.Collect(set.All), "")
 }
@@ -69,7 +76,7 @@ func TestFlagSet_Lookup(t *testing.T) {
 	set.String("flagB", "description", "test")
 
 	flagA, okA := set.Lookup("flagA")
-	assertEquals(t, feature.FlagKindBool, flagA.Kind, "flagA kind mismatch")
+	assertEquals(t, feature.FlagKindAny, flagA.Kind, "flagA kind mismatch")
 	assertEquals(t, "flagA", flagA.Name, "flagA name mismatch")
 	assertEquals(t, "", flagA.Description, "flagA description mismatch")
 	assertEquals(t, true, okA, "flagA not marked as ok")
@@ -101,6 +108,46 @@ func TestFlagSet_Context(t *testing.T) {
 		assertPanicErrorString(t, `invalid value kind for flag "test"`, func() {
 			set.Context(t.Context(), feature.StringValue("test", "value"))
 		})
+	})
+}
+
+func TestFlagSet_Any(t *testing.T) {
+	t.Run("Duplicate", func(t *testing.T) {
+		var set feature.FlagSet
+		set.String("test", "test flag", "")
+
+		assertPanic(t, feature.ErrDuplicateFlag, func() {
+			set.Any("test", "test flag", nil)
+		})
+	})
+
+	t.Run("Default", func(t *testing.T) {
+		ctx := t.Context()
+
+		var set feature.FlagSet
+		v := set.Any("test", "test flag", nil)
+
+		assertEquals(t, nil, v(ctx), "")
+	})
+
+	t.Run("Override", func(t *testing.T) {
+		ctx := t.Context()
+
+		var set feature.FlagSet
+		v1 := set.Any("test1", "test flag", false)
+		v2 := set.Any("test2", "test flag", true)
+
+		ctx = set.Context(ctx,
+			feature.AnyValue("test1", true),
+			feature.AnyValue("test2", false))
+
+		var otherSet feature.FlagSet
+		ctx = otherSet.Context(ctx,
+			feature.AnyValue("test1", false),
+			feature.AnyValue("test2", true))
+
+		assertEquals(t, true, v1(ctx), "")
+		assertEquals(t, false, v2(ctx), "")
 	})
 }
 
@@ -341,6 +388,32 @@ func TestFlagSet_Uint(t *testing.T) {
 
 		assertEquals(t, 15, v1(ctx), "")
 		assertEquals(t, 20, v2(ctx), "")
+	})
+}
+
+func BenchmarkFlagSet_Any(b *testing.B) {
+	b.Run("Context", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.Any("test", "test flag", false)
+		ctx := set.Context(b.Context(), feature.AnyValue("test", true))
+
+		b.ReportAllocs()
+
+		for b.Loop() {
+			flag(ctx)
+		}
+	})
+
+	b.Run("Default", func(b *testing.B) {
+		var set feature.FlagSet
+		flag := set.Any("test", "test flag", false)
+		ctx := set.Context(b.Context(), feature.AnyValue("unused", false))
+
+		b.ReportAllocs()
+
+		for b.Loop() {
+			flag(ctx)
+		}
 	})
 }
 

@@ -37,6 +37,9 @@ const (
 	// FlagKindInvalid is the zero value of FlagKind and is not considered valid value.
 	FlagKindInvalid FlagKind = iota
 
+	// FlagKindAny is used for flags created via [FlagSet.Any] and [FlagSet.AnyFunc].
+	FlagKindAny
+
 	// FlagKindBool is used for flags created via [FlagSet.Bool] and [FlagSet.BoolFunc].
 	FlagKindBool
 
@@ -76,6 +79,7 @@ type Value struct {
 	name string
 
 	kind     FlagKind
+	any      any
 	bool     bool
 	duration time.Duration
 	int      int
@@ -169,9 +173,38 @@ func (s *FlagSet) add(kind FlagKind, name string, desc string) {
 	s.flags.Store(flags.add(f.Name, f))
 }
 
+// AnyValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
+func AnyValue(name string, value any) Value {
+	return Value{name: name, kind: FlagKindAny, any: value}
+}
+
+// Any registers a new flag that represents an arbitrary value.
+//
+// If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
+func (s *FlagSet) Any(name string, desc string, value any) func(context.Context) any {
+	return s.AnyFunc(name, desc, func(context.Context) any { return value })
+}
+
+// AnyFunc registers a new flag that represents an arbitrary value produced by calling the given function.
+//
+// If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
+func (s *FlagSet) AnyFunc(name string, desc string, valueFn func(context.Context) any) func(context.Context) any {
+	f := func(ctx context.Context) any {
+		v, ok := s.value(ctx, name, FlagKindAny)
+		if ok {
+			return v.any
+		}
+		return valueFn(ctx)
+	}
+
+	s.add(FlagKindAny, name, desc)
+
+	return f
+}
+
 // BoolValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
 func BoolValue(name string, value bool) Value {
-	return Value{name: name, kind: FlagKindBool, bool: value}
+	return Value{name: name, kind: FlagKindAny, bool: value}
 }
 
 // Bool registers a new flag that represents a boolean value.
@@ -186,14 +219,14 @@ func (s *FlagSet) Bool(name string, desc string, value bool) func(context.Contex
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) BoolFunc(name string, desc string, valueFn func(context.Context) bool) func(context.Context) bool {
 	f := func(ctx context.Context) bool {
-		v, ok := s.value(ctx, name, FlagKindBool)
+		v, ok := s.value(ctx, name, FlagKindAny)
 		if ok {
 			return v.bool
 		}
 		return valueFn(ctx)
 	}
 
-	s.add(FlagKindBool, name, desc)
+	s.add(FlagKindAny, name, desc)
 
 	return f
 }

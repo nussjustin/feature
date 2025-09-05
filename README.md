@@ -12,6 +12,7 @@ Flags are created using a specific method based on the type of the value of the 
 
 Currently, the supported methods are
 
+* [FlagSet.Any][14] and [FlagSet.AnyFunc][15] for flags with arbitrary values,
 * [FlagSet.Bool][1] and [FlagSet.BoolFunc][8] for boolean flags,
 * [FlagSet.Duration][7] and [FlagSet.DurationFunc][9] for duration flags,
 * [FlagSet.Float64][2] and [FlagSet.Float64Func][10] for float flags,
@@ -123,3 +124,5 @@ Please make sure to update tests as appropriate.
 [11]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.IntFunc
 [12]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.StringFunc
 [13]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.UintFunc
+[14]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Any
+[15]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.AnyFunc
