@@ -111,6 +111,16 @@ func TestFlagSet_Context(t *testing.T) {
 	})
 }
 
+var testFlagKey = new(int)
+
+func hasTestFlag(ctx context.Context) bool {
+	return ctx.Value(testFlagKey) != nil
+}
+
+func withTestFlag(ctx context.Context) context.Context {
+	return context.WithValue(ctx, testFlagKey, true)
+}
+
 func TestFlagSet_Any(t *testing.T) {
 	t.Run("Duplicate", func(t *testing.T) {
 		var set feature.FlagSet
@@ -128,6 +138,21 @@ func TestFlagSet_Any(t *testing.T) {
 		v := set.Any("test", "test flag", nil)
 
 		assertEquals(t, nil, v(ctx), "")
+	})
+
+	t.Run("Func", func(t *testing.T) {
+		ctx := t.Context()
+
+		var set feature.FlagSet
+		v := set.AnyFunc("test", "test flag", func(ctx context.Context) any {
+			if hasTestFlag(ctx) {
+				return "test"
+			}
+			return nil
+		})
+
+		assertEquals(t, nil, v(ctx), "")
+		assertEquals(t, "test", v(withTestFlag(ctx)), "")
 	})
 
 	t.Run("Override", func(t *testing.T) {
@@ -170,6 +195,16 @@ func TestFlagSet_Bool(t *testing.T) {
 		assertEquals(t, false, v(ctx), "")
 	})
 
+	t.Run("Func", func(t *testing.T) {
+		ctx := t.Context()
+
+		var set feature.FlagSet
+		v := set.BoolFunc("test", "test flag", hasTestFlag)
+
+		assertEquals(t, false, v(ctx), "")
+		assertEquals(t, true, v(withTestFlag(ctx)), "")
+	})
+
 	t.Run("Override", func(t *testing.T) {
 		ctx := t.Context()
 
@@ -208,6 +243,21 @@ func TestFlagSet_Duration(t *testing.T) {
 		v := set.Duration("test", "test flag", 5)
 
 		assertEquals(t, 5, v(ctx), "")
+	})
+
+	t.Run("Func", func(t *testing.T) {
+		ctx := t.Context()
+
+		var set feature.FlagSet
+		v := set.DurationFunc("test", "test flag", func(ctx context.Context) time.Duration {
+			if hasTestFlag(ctx) {
+				return time.Second
+			}
+			return 0
+		})
+
+		assertEquals(t, 0, v(ctx), "")
+		assertEquals(t, time.Second, v(withTestFlag(ctx)), "")
 	})
 
 	t.Run("Override", func(t *testing.T) {
@@ -250,6 +300,21 @@ func TestFlagSet_Float(t *testing.T) {
 		assertEquals(t, 5.0, v(ctx), "")
 	})
 
+	t.Run("Func", func(t *testing.T) {
+		ctx := t.Context()
+
+		var set feature.FlagSet
+		v := set.Float64Func("test", "test flag", func(ctx context.Context) float64 {
+			if hasTestFlag(ctx) {
+				return 1
+			}
+			return 0
+		})
+
+		assertEquals(t, 0, v(ctx), "")
+		assertEquals(t, 1, v(withTestFlag(ctx)), "")
+	})
+
 	t.Run("Override", func(t *testing.T) {
 		ctx := t.Context()
 
@@ -288,6 +353,21 @@ func TestFlagSet_Int(t *testing.T) {
 		v := set.Int("test", "test flag", 5)
 
 		assertEquals(t, 5, v(ctx), "")
+	})
+
+	t.Run("Func", func(t *testing.T) {
+		ctx := t.Context()
+
+		var set feature.FlagSet
+		v := set.IntFunc("test", "test flag", func(ctx context.Context) int {
+			if hasTestFlag(ctx) {
+				return 1
+			}
+			return 0
+		})
+
+		assertEquals(t, 0, v(ctx), "")
+		assertEquals(t, 1, v(withTestFlag(ctx)), "")
 	})
 
 	t.Run("Override", func(t *testing.T) {
@@ -330,6 +410,21 @@ func TestFlagSet_String(t *testing.T) {
 		assertEquals(t, "default", v(ctx), "")
 	})
 
+	t.Run("Func", func(t *testing.T) {
+		ctx := t.Context()
+
+		var set feature.FlagSet
+		v := set.StringFunc("test", "test flag", func(ctx context.Context) string {
+			if hasTestFlag(ctx) {
+				return "test"
+			}
+			return ""
+		})
+
+		assertEquals(t, "", v(ctx), "")
+		assertEquals(t, "test", v(withTestFlag(ctx)), "")
+	})
+
 	t.Run("Override", func(t *testing.T) {
 		ctx := t.Context()
 
@@ -368,6 +463,21 @@ func TestFlagSet_Uint(t *testing.T) {
 		v := set.Uint("test", "test flag", 5)
 
 		assertEquals(t, 5, v(ctx), "")
+	})
+
+	t.Run("Func", func(t *testing.T) {
+		ctx := t.Context()
+
+		var set feature.FlagSet
+		v := set.UintFunc("test", "test flag", func(ctx context.Context) uint {
+			if hasTestFlag(ctx) {
+				return 1
+			}
+			return 0
+		})
+
+		assertEquals(t, 0, v(ctx), "")
+		assertEquals(t, 1, v(withTestFlag(ctx)), "")
 	})
 
 	t.Run("Override", func(t *testing.T) {
