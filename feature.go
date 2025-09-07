@@ -204,7 +204,7 @@ func (s *FlagSet) AnyFunc(name string, desc string, valueFn func(context.Context
 
 // BoolValue returns a Value that can be passed to [FlagSet.Context] to override the value for the given flag.
 func BoolValue(name string, value bool) Value {
-	return Value{name: name, kind: FlagKindAny, bool: value}
+	return Value{name: name, kind: FlagKindBool, bool: value}
 }
 
 // Bool registers a new flag that represents a boolean value.
@@ -219,14 +219,14 @@ func (s *FlagSet) Bool(name string, desc string, value bool) func(context.Contex
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) BoolFunc(name string, desc string, valueFn func(context.Context) bool) func(context.Context) bool {
 	f := func(ctx context.Context) bool {
-		v, ok := s.value(ctx, name, FlagKindAny)
+		v, ok := s.value(ctx, name, FlagKindBool)
 		if ok {
 			return v.bool
 		}
 		return valueFn(ctx)
 	}
 
-	s.add(FlagKindAny, name, desc)
+	s.add(FlagKindBool, name, desc)
 
 	return f
 }

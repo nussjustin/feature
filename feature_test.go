@@ -77,7 +77,7 @@ func TestFlagSet_Lookup(t *testing.T) {
 	set.String("flagB", "description", "test")
 
 	flagA, okA := set.Lookup("flagA")
-	assertEquals(t, feature.FlagKindAny, flagA.Kind, "flagA kind mismatch")
+	assertEquals(t, feature.FlagKindBool, flagA.Kind, "flagA kind mismatch")
 	assertEquals(t, "flagA", flagA.Name, "flagA name mismatch")
 	assertEquals(t, "", flagA.Description, "flagA description mismatch")
 	assertEquals(t, true, okA, "flagA not marked as ok")
