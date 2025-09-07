@@ -211,19 +211,19 @@ func BoolValue(name string, value bool) Value {
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Bool(name string, desc string, value bool) func(context.Context) bool {
-	return s.BoolFunc(name, desc, func(context.Context) bool { return value })
+	return s.BoolFunc(name, desc, func(context.Context, string) bool { return value })
 }
 
 // BoolFunc registers a new flag that represents a boolean value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) BoolFunc(name string, desc string, valueFn func(context.Context) bool) func(context.Context) bool {
+func (s *FlagSet) BoolFunc(name string, desc string, valueFn func(context.Context, string) bool) func(context.Context) bool {
 	f := func(ctx context.Context) bool {
 		v, ok := s.value(ctx, name, FlagKindBool)
 		if ok {
 			return v.bool
 		}
-		return valueFn(ctx)
+		return valueFn(ctx, name)
 	}
 
 	s.add(FlagKindBool, name, desc)
@@ -240,19 +240,19 @@ func DurationValue(name string, value time.Duration) Value {
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Duration(name string, desc string, value time.Duration) func(context.Context) time.Duration {
-	return s.DurationFunc(name, desc, func(context.Context) time.Duration { return value })
+	return s.DurationFunc(name, desc, func(context.Context, string) time.Duration { return value })
 }
 
 // DurationFunc registers a new flag that represents a duration value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) DurationFunc(name string, desc string, valueFn func(context.Context) time.Duration) func(context.Context) time.Duration {
+func (s *FlagSet) DurationFunc(name string, desc string, valueFn func(context.Context, string) time.Duration) func(context.Context) time.Duration {
 	f := func(ctx context.Context) time.Duration {
 		v, ok := s.value(ctx, name, FlagKindDuration)
 		if ok {
 			return v.duration
 		}
-		return valueFn(ctx)
+		return valueFn(ctx, name)
 	}
 
 	s.add(FlagKindDuration, name, desc)
@@ -269,19 +269,19 @@ func Float64Value(name string, value float64) Value {
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Float64(name string, desc string, value float64) func(context.Context) float64 {
-	return s.Float64Func(name, desc, func(context.Context) float64 { return value })
+	return s.Float64Func(name, desc, func(context.Context, string) float64 { return value })
 }
 
 // Float64Func registers a new flag that represents a floating point value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Float64Func(name string, desc string, valueFn func(context.Context) float64) func(context.Context) float64 {
+func (s *FlagSet) Float64Func(name string, desc string, valueFn func(context.Context, string) float64) func(context.Context) float64 {
 	f := func(ctx context.Context) float64 {
 		v, ok := s.value(ctx, name, FlagKindFloat64)
 		if ok {
 			return v.float64
 		}
-		return valueFn(ctx)
+		return valueFn(ctx, name)
 	}
 
 	s.add(FlagKindFloat64, name, desc)
@@ -298,19 +298,19 @@ func IntValue(name string, value int) Value {
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Int(name string, desc string, value int) func(context.Context) int {
-	return s.IntFunc(name, desc, func(context.Context) int { return value })
+	return s.IntFunc(name, desc, func(context.Context, string) int { return value })
 }
 
 // IntFunc registers a new flag that represents an integer value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) IntFunc(name string, desc string, valueFn func(context.Context) int) func(context.Context) int {
+func (s *FlagSet) IntFunc(name string, desc string, valueFn func(context.Context, string) int) func(context.Context) int {
 	f := func(ctx context.Context) int {
 		v, ok := s.value(ctx, name, FlagKindInt)
 		if ok {
 			return v.int
 		}
-		return valueFn(ctx)
+		return valueFn(ctx, name)
 	}
 
 	s.add(FlagKindInt, name, desc)
@@ -327,19 +327,19 @@ func StringValue(name string, value string) Value {
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) String(name string, desc string, value string) func(context.Context) string {
-	return s.StringFunc(name, desc, func(context.Context) string { return value })
+	return s.StringFunc(name, desc, func(context.Context, string) string { return value })
 }
 
 // StringFunc registers a new flag that represents a string value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) StringFunc(name string, desc string, valueFn func(context.Context) string) func(context.Context) string {
+func (s *FlagSet) StringFunc(name string, desc string, valueFn func(context.Context, string) string) func(context.Context) string {
 	f := func(ctx context.Context) string {
 		v, ok := s.value(ctx, name, FlagKindString)
 		if ok {
 			return v.string
 		}
-		return valueFn(ctx)
+		return valueFn(ctx, name)
 	}
 
 	s.add(FlagKindString, name, desc)
@@ -356,19 +356,19 @@ func UintValue(name string, value uint) Value {
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Uint(name string, desc string, value uint) func(context.Context) uint {
-	return s.UintFunc(name, desc, func(context.Context) uint { return value })
+	return s.UintFunc(name, desc, func(context.Context, string) uint { return value })
 }
 
 // UintFunc registers a new flag that represents an unsigned integer value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) UintFunc(name string, desc string, valueFn func(context.Context) uint) func(context.Context) uint {
+func (s *FlagSet) UintFunc(name string, desc string, valueFn func(context.Context, string) uint) func(context.Context) uint {
 	f := func(ctx context.Context) uint {
 		v, ok := s.value(ctx, name, FlagKindUint)
 		if ok {
 			return v.uint
 		}
-		return valueFn(ctx)
+		return valueFn(ctx, name)
 	}
 
 	s.add(FlagKindUint, name, desc)
@@ -380,15 +380,15 @@ func (s *FlagSet) UintFunc(name string, desc string, valueFn func(context.Contex
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func Typed[T any](s *FlagSet, name string, desc string, value T) func(context.Context) T {
-	return TypedFunc(s, name, desc, func(context.Context) T { return value })
+	return TypedFunc(s, name, desc, func(context.Context, string) T { return value })
 }
 
 // TypedFunc registers a new flag that represents a value of type T value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func TypedFunc[T any](s *FlagSet, name string, desc string, value func(context.Context) T) func(context.Context) T {
+func TypedFunc[T any](s *FlagSet, name string, desc string, value func(context.Context, string) T) func(context.Context) T {
 	f := s.AnyFunc(name, desc, func(ctx context.Context) any {
-		return value(ctx)
+		return value(ctx, name)
 	})
 
 	return func(ctx context.Context) T {

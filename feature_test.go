@@ -22,32 +22,32 @@ func TestFlagSet_All(t *testing.T) {
 	})
 
 	set.Bool("bool", "bool value", false)
-	set.BoolFunc("bool-func", "bool value", func(context.Context) bool {
+	set.BoolFunc("bool-func", "bool value", func(context.Context, string) bool {
 		return false
 	})
 
 	set.Duration("duration", "duration value", 0)
-	set.DurationFunc("duration-func", "duration value", func(context.Context) time.Duration {
+	set.DurationFunc("duration-func", "duration value", func(context.Context, string) time.Duration {
 		return 0
 	})
 
 	set.Float64("float64", "float64 value", 0.0)
-	set.Float64Func("float64-func", "float64 value", func(context.Context) float64 {
+	set.Float64Func("float64-func", "float64 value", func(context.Context, string) float64 {
 		return 0.0
 	})
 
 	set.Int("int", "int value", 0)
-	set.IntFunc("int-func", "int value", func(context.Context) int {
+	set.IntFunc("int-func", "int value", func(context.Context, string) int {
 		return 0
 	})
 
 	set.String("string", "string value", "")
-	set.StringFunc("string-func", "string value", func(context.Context) string {
+	set.StringFunc("string-func", "string value", func(context.Context, string) string {
 		return ""
 	})
 
 	set.Uint("uint", "uint value", 0)
-	set.UintFunc("uint-func", "uint value", func(context.Context) uint {
+	set.UintFunc("uint-func", "uint value", func(context.Context, string) uint {
 		return 0
 	})
 
@@ -200,7 +200,9 @@ func TestFlagSet_Bool(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.BoolFunc("test", "test flag", hasTestFlag)
+		v := set.BoolFunc("test", "test flag", func(ctx context.Context, _ string) bool {
+			return hasTestFlag(ctx)
+		})
 
 		assertEquals(t, false, v(ctx), "")
 		assertEquals(t, true, v(withTestFlag(ctx)), "")
@@ -250,7 +252,7 @@ func TestFlagSet_Duration(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.DurationFunc("test", "test flag", func(ctx context.Context) time.Duration {
+		v := set.DurationFunc("test", "test flag", func(ctx context.Context, _ string) time.Duration {
 			if hasTestFlag(ctx) {
 				return time.Second
 			}
@@ -305,7 +307,7 @@ func TestFlagSet_Float64(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.Float64Func("test", "test flag", func(ctx context.Context) float64 {
+		v := set.Float64Func("test", "test flag", func(ctx context.Context, _ string) float64 {
 			if hasTestFlag(ctx) {
 				return 1
 			}
@@ -360,7 +362,7 @@ func TestFlagSet_Int(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.IntFunc("test", "test flag", func(ctx context.Context) int {
+		v := set.IntFunc("test", "test flag", func(ctx context.Context, _ string) int {
 			if hasTestFlag(ctx) {
 				return 1
 			}
@@ -415,7 +417,7 @@ func TestFlagSet_String(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.StringFunc("test", "test flag", func(ctx context.Context) string {
+		v := set.StringFunc("test", "test flag", func(ctx context.Context, _ string) string {
 			if hasTestFlag(ctx) {
 				return "test"
 			}
@@ -470,7 +472,7 @@ func TestFlagSet_Uint(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.UintFunc("test", "test flag", func(ctx context.Context) uint {
+		v := set.UintFunc("test", "test flag", func(ctx context.Context, _ string) uint {
 			if hasTestFlag(ctx) {
 				return 1
 			}
@@ -527,7 +529,7 @@ func TestTyped(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := feature.TypedFunc(&set, "test", "test flag", func(ctx context.Context) testStruct {
+		v := feature.TypedFunc(&set, "test", "test flag", func(ctx context.Context, _ string) testStruct {
 			if hasTestFlag(ctx) {
 				return testStruct{value: 5}
 			}
