@@ -80,18 +80,21 @@ func TestFlagSet_Lookup(t *testing.T) {
 	assertEquals(t, feature.FlagKindBool, flagA.Kind, "flagA kind mismatch")
 	assertEquals(t, "flagA", flagA.Name, "flagA name mismatch")
 	assertEquals(t, "", flagA.Description, "flagA description mismatch")
+	assertEquals(t, false, flagA.Func.(feature.Func[bool])(t.Context()), "flagA func returned wrong value")
 	assertEquals(t, true, okA, "flagA not marked as ok")
 
 	flagB, okB := set.Lookup("flagB")
 	assertEquals(t, feature.FlagKindString, flagB.Kind, "flagB kind mismatch")
 	assertEquals(t, "flagB", flagB.Name, "flagB name mismatch")
 	assertEquals(t, "description", flagB.Description, "flagB name mismatch")
+	assertEquals(t, "test", flagB.Func.(feature.Func[string])(t.Context()), "flagA func returned wrong value")
 	assertEquals(t, true, okB, "flagB not marked as ok")
 
 	flagC, okC := set.Lookup("flagC")
 	assertEquals(t, feature.FlagKindInvalid, flagC.Kind, "flagC kind mismatch")
 	assertEquals(t, "", flagC.Name, "flagC name mismatch")
 	assertEquals(t, "", flagC.Description, "flagC name mismatch")
+	assertEquals(t, nil, flagC.Func, "flagC func mismatch")
 	assertEquals(t, false, okC, "flagC marked as ok")
 }
 

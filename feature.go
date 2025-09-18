@@ -28,6 +28,10 @@ type Flag struct {
 
 	// Description is an optional description specified using [WithDescription].
 	Description string
+
+	// Func is the function that was returned when the feature flag was registered and which returns its value for the
+	// given context.
+	Func any
 }
 
 // FlagKind is an enum of potential flag kinds.
@@ -124,8 +128,8 @@ func (s *FlagSet) value(ctx context.Context, name string, kind FlagKind) (Value,
 	return v, true
 }
 
-func (s *FlagSet) add(kind FlagKind, name string, desc string) {
-	f := Flag{Kind: kind, Name: name, Description: desc}
+func (s *FlagSet) add(kind FlagKind, name string, desc string, fn any) {
+	f := Flag{Kind: kind, Name: name, Description: desc, Func: fn}
 
 	s.flagsMu.Lock()
 	defer s.flagsMu.Unlock()
@@ -163,7 +167,7 @@ func (s *FlagSet) AnyFunc(name string, desc string, valueFn Func[any]) Func[any]
 		return valueFn(ctx)
 	}
 
-	s.add(FlagKindAny, name, desc)
+	s.add(FlagKindAny, name, desc, Func[any](f))
 
 	return f
 }
@@ -192,7 +196,7 @@ func (s *FlagSet) BoolFunc(name string, desc string, valueFn Func[bool]) Func[bo
 		return valueFn(ctx)
 	}
 
-	s.add(FlagKindBool, name, desc)
+	s.add(FlagKindBool, name, desc, Func[bool](f))
 
 	return f
 }
@@ -221,7 +225,7 @@ func (s *FlagSet) DurationFunc(name string, desc string, valueFn Func[time.Durat
 		return valueFn(ctx)
 	}
 
-	s.add(FlagKindDuration, name, desc)
+	s.add(FlagKindDuration, name, desc, Func[time.Duration](f))
 
 	return f
 }
@@ -250,7 +254,7 @@ func (s *FlagSet) Float64Func(name string, desc string, valueFn Func[float64]) F
 		return valueFn(ctx)
 	}
 
-	s.add(FlagKindFloat64, name, desc)
+	s.add(FlagKindFloat64, name, desc, Func[float64](f))
 
 	return f
 }
@@ -279,7 +283,7 @@ func (s *FlagSet) IntFunc(name string, desc string, valueFn Func[int]) Func[int]
 		return valueFn(ctx)
 	}
 
-	s.add(FlagKindInt, name, desc)
+	s.add(FlagKindInt, name, desc, Func[int](f))
 
 	return f
 }
@@ -308,7 +312,7 @@ func (s *FlagSet) StringFunc(name string, desc string, valueFn Func[string]) Fun
 		return valueFn(ctx)
 	}
 
-	s.add(FlagKindString, name, desc)
+	s.add(FlagKindString, name, desc, Func[string](f))
 
 	return f
 }
@@ -337,7 +341,7 @@ func (s *FlagSet) UintFunc(name string, desc string, valueFn Func[uint]) Func[ui
 		return valueFn(ctx)
 	}
 
-	s.add(FlagKindUint, name, desc, f)
+	s.add(FlagKindUint, name, desc, Func[uint](f))
 
 	return f
 }
