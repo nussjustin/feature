@@ -17,7 +17,7 @@ func TestFlagSet_All(t *testing.T) {
 	var set feature.FlagSet
 
 	set.Any("any", "any value", nil)
-	set.AnyFunc("any-func", "any value", func(context.Context) any {
+	set.AnyFunc("any-func", "any value", func(context.Context, string) any {
 		return nil
 	})
 
@@ -145,7 +145,7 @@ func TestFlagSet_Any(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.AnyFunc("test", "test flag", func(ctx context.Context) any {
+		v := set.AnyFunc("test", "test flag", func(ctx context.Context, _ string) any {
 			if hasTestFlag(ctx) {
 				return "test"
 			}

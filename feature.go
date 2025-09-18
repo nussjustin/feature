@@ -71,6 +71,9 @@ type FlagSet struct {
 	flags   atomic.Value // of sortedMap[Flag]
 }
 
+// Func specifies the signature for functions that return feature flag values.
+type Func[T any] func(ctx context.Context, name string) T
+
 // Value specifies a custom value for a feature flag, which can be assigned to a [context.Context].
 //
 // A Value must be created using one of [BoolValue], [DurationValue], [Float64Value], [IntValue], [StringValue] or
@@ -182,19 +185,19 @@ func AnyValue(name string, value any) Value {
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
 func (s *FlagSet) Any(name string, desc string, value any) func(context.Context) any {
-	return s.AnyFunc(name, desc, func(context.Context) any { return value })
+	return s.AnyFunc(name, desc, func(context.Context, string) any { return value })
 }
 
 // AnyFunc registers a new flag that represents an arbitrary value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) AnyFunc(name string, desc string, valueFn func(context.Context) any) func(context.Context) any {
+func (s *FlagSet) AnyFunc(name string, desc string, valueFn Func[any]) func(context.Context) any {
 	f := func(ctx context.Context) any {
 		v, ok := s.value(ctx, name, FlagKindAny)
 		if ok {
 			return v.any
 		}
-		return valueFn(ctx)
+		return valueFn(ctx, name)
 	}
 
 	s.add(FlagKindAny, name, desc)
@@ -217,7 +220,7 @@ func (s *FlagSet) Bool(name string, desc string, value bool) func(context.Contex
 // BoolFunc registers a new flag that represents a boolean value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) BoolFunc(name string, desc string, valueFn func(context.Context, string) bool) func(context.Context) bool {
+func (s *FlagSet) BoolFunc(name string, desc string, valueFn Func[bool]) func(context.Context) bool {
 	f := func(ctx context.Context) bool {
 		v, ok := s.value(ctx, name, FlagKindBool)
 		if ok {
@@ -246,7 +249,7 @@ func (s *FlagSet) Duration(name string, desc string, value time.Duration) func(c
 // DurationFunc registers a new flag that represents a duration value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) DurationFunc(name string, desc string, valueFn func(context.Context, string) time.Duration) func(context.Context) time.Duration {
+func (s *FlagSet) DurationFunc(name string, desc string, valueFn Func[time.Duration]) func(context.Context) time.Duration {
 	f := func(ctx context.Context) time.Duration {
 		v, ok := s.value(ctx, name, FlagKindDuration)
 		if ok {
@@ -275,7 +278,7 @@ func (s *FlagSet) Float64(name string, desc string, value float64) func(context.
 // Float64Func registers a new flag that represents a floating point value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) Float64Func(name string, desc string, valueFn func(context.Context, string) float64) func(context.Context) float64 {
+func (s *FlagSet) Float64Func(name string, desc string, valueFn Func[float64]) func(context.Context) float64 {
 	f := func(ctx context.Context) float64 {
 		v, ok := s.value(ctx, name, FlagKindFloat64)
 		if ok {
@@ -304,7 +307,7 @@ func (s *FlagSet) Int(name string, desc string, value int) func(context.Context)
 // IntFunc registers a new flag that represents an integer value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) IntFunc(name string, desc string, valueFn func(context.Context, string) int) func(context.Context) int {
+func (s *FlagSet) IntFunc(name string, desc string, valueFn Func[int]) func(context.Context) int {
 	f := func(ctx context.Context) int {
 		v, ok := s.value(ctx, name, FlagKindInt)
 		if ok {
@@ -333,7 +336,7 @@ func (s *FlagSet) String(name string, desc string, value string) func(context.Co
 // StringFunc registers a new flag that represents a string value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) StringFunc(name string, desc string, valueFn func(context.Context, string) string) func(context.Context) string {
+func (s *FlagSet) StringFunc(name string, desc string, valueFn Func[string]) func(context.Context) string {
 	f := func(ctx context.Context) string {
 		v, ok := s.value(ctx, name, FlagKindString)
 		if ok {
@@ -362,7 +365,7 @@ func (s *FlagSet) Uint(name string, desc string, value uint) func(context.Contex
 // UintFunc registers a new flag that represents an unsigned integer value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func (s *FlagSet) UintFunc(name string, desc string, valueFn func(context.Context, string) uint) func(context.Context) uint {
+func (s *FlagSet) UintFunc(name string, desc string, valueFn Func[uint]) func(context.Context) uint {
 	f := func(ctx context.Context) uint {
 		v, ok := s.value(ctx, name, FlagKindUint)
 		if ok {
@@ -386,8 +389,8 @@ func Typed[T any](s *FlagSet, name string, desc string, value T) func(context.Co
 // TypedFunc registers a new flag that represents a value of type T value produced by calling the given function.
 //
 // If a [Flag] with the same name is already registered, the call will panic with an error that is [ErrDuplicateFlag].
-func TypedFunc[T any](s *FlagSet, name string, desc string, value func(context.Context, string) T) func(context.Context) T {
-	f := s.AnyFunc(name, desc, func(ctx context.Context) any {
+func TypedFunc[T any](s *FlagSet, name string, desc string, value Func[T]) func(context.Context) T {
+	f := s.AnyFunc(name, desc, func(ctx context.Context, name string) any {
 		return value(ctx, name)
 	})
 
