@@ -61,8 +61,6 @@ const (
 
 // FlagSet represents a set of defined feature flags.
 //
-// The zero value is valid and returns zero values for all flags.
-//
 // A FlagSet must not be copied and should instead be passed around via pointer.
 type FlagSet struct {
 	noCopy noCopy
