@@ -544,9 +544,10 @@ func BenchmarkFlagSet_Any(b *testing.B) {
 	})
 
 	b.Run("Default", func(b *testing.B) {
+		ctx := b.Context()
+
 		var set feature.FlagSet
 		flag := set.Any("test", "test flag", false)
-		ctx := set.WithValues(b.Context(), feature.AnyValue("unused", false))
 
 		b.ReportAllocs()
 
@@ -570,9 +571,10 @@ func BenchmarkFlagSet_Bool(b *testing.B) {
 	})
 
 	b.Run("Default", func(b *testing.B) {
+		ctx := b.Context()
+
 		var set feature.FlagSet
 		flag := set.Bool("test", "test flag", false)
-		ctx := set.WithValues(b.Context(), feature.BoolValue("unused", false))
 
 		b.ReportAllocs()
 
@@ -596,9 +598,10 @@ func BenchmarkFlagSet_Float64(b *testing.B) {
 	})
 
 	b.Run("Default", func(b *testing.B) {
+		ctx := b.Context()
+
 		var set feature.FlagSet
 		flag := set.Float64("test", "test flag", 5.0)
-		ctx := set.WithValue(b.Context(), feature.Float64Value("unused", 0.0))
 
 		b.ReportAllocs()
 
@@ -622,9 +625,10 @@ func BenchmarkFlagSet_Int(b *testing.B) {
 	})
 
 	b.Run("Default", func(b *testing.B) {
+		ctx := b.Context()
+
 		var set feature.FlagSet
 		flag := set.Int("test", "test flag", 5.0)
-		ctx := set.WithValue(b.Context(), feature.IntValue("unused", 0))
 
 		b.ReportAllocs()
 
@@ -648,9 +652,10 @@ func BenchmarkFlagSet_String(b *testing.B) {
 	})
 
 	b.Run("Default", func(b *testing.B) {
+		ctx := b.Context()
+
 		var set feature.FlagSet
 		flag := set.String("test", "test flag", "test")
-		ctx := set.WithValue(b.Context(), feature.StringValue("unused", ""))
 
 		b.ReportAllocs()
 
@@ -674,9 +679,10 @@ func BenchmarkFlagSet_Uint(b *testing.B) {
 	})
 
 	b.Run("Default", func(b *testing.B) {
+		ctx := b.Context()
+
 		var set feature.FlagSet
 		flag := set.Uint("test", "test flag", 5)
-		ctx := set.WithValue(b.Context(), feature.UintValue("unused", 0))
 
 		b.ReportAllocs()
 
@@ -700,9 +706,10 @@ func BenchmarkTyped(b *testing.B) {
 	})
 
 	b.Run("Default", func(b *testing.B) {
+		ctx := b.Context()
+
 		var set feature.FlagSet
 		flag := feature.Typed(&set, "test", "test flag", testStruct{value: 5})
-		ctx := set.WithValue(b.Context(), feature.AnyValue("unused", 0))
 
 		b.ReportAllocs()
 
