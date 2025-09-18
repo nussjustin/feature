@@ -112,41 +112,6 @@ func (s *FlagSet) Lookup(name string) (Flag, bool) {
 	return f, ok
 }
 
-// Context returns a new context based on ctx which will use the given values when checking feature flags of this set.
-//
-// If a values type does not match the flags type, Context will panic.
-//
-// Values with no matching flag are ignored.
-func (s *FlagSet) Context(ctx context.Context, values ...Value) context.Context {
-	if len(values) == 0 {
-		return ctx
-	}
-
-	flags, _ := s.flags.Load().(sortedMap[Flag])
-
-	m, ok := ctx.Value((*valuesMapKey)(s)).(valuesMap)
-	if !ok {
-		m = make(valuesMap, len(values))
-	} else {
-		m = maps.Clone(m)
-	}
-
-	for _, v := range values {
-		f, ok := flags.m[v.name]
-		if !ok {
-			continue
-		}
-
-		if f.Kind != v.kind {
-			panic(fmt.Errorf("invalid value kind for flag %q", v.name))
-		}
-
-		m[v.name] = v
-	}
-
-	return context.WithValue(ctx, (*valuesMapKey)(s), m)
-}
-
 func (s *FlagSet) value(ctx context.Context, name string, kind FlagKind) (Value, bool) {
 	m, ok := ctx.Value((*valuesMapKey)(s)).(valuesMap)
 	if !ok {
@@ -372,9 +337,69 @@ func (s *FlagSet) UintFunc(name string, desc string, valueFn Func[uint]) Func[ui
 		return valueFn(ctx)
 	}
 
-	s.add(FlagKindUint, name, desc)
+	s.add(FlagKindUint, name, desc, f)
 
 	return f
+}
+
+// WithValue is like WithValues but more efficient when only one value is set.
+func (s *FlagSet) WithValue(ctx context.Context, value Value) context.Context {
+	flags, _ := s.flags.Load().(sortedMap[Flag])
+
+	m, ok := ctx.Value((*valuesMapKey)(s)).(valuesMap)
+	if !ok {
+		m = make(valuesMap, 1)
+	} else {
+		m = maps.Clone(m)
+	}
+
+	f, ok := flags.m[value.name]
+	if !ok {
+		panic(fmt.Errorf("flag %q not found", value.name))
+	}
+
+	if f.Kind != value.kind {
+		panic(fmt.Errorf("invalid value kind for flag %q", value.name))
+	}
+
+	m[value.name] = value
+
+	return context.WithValue(ctx, (*valuesMapKey)(s), m)
+}
+
+// WithValues returns a new context based on ctx which will use the given values when checking feature flags of this set.
+//
+// If a values type does not match the flags type, WithValues will panic.
+//
+// Values with no matching flag will panic.
+func (s *FlagSet) WithValues(ctx context.Context, values ...Value) context.Context {
+	if len(values) == 0 {
+		return ctx
+	}
+
+	flags, _ := s.flags.Load().(sortedMap[Flag])
+
+	m, ok := ctx.Value((*valuesMapKey)(s)).(valuesMap)
+	if !ok {
+		m = make(valuesMap, len(values))
+	} else {
+		m = maps.Clone(m)
+	}
+
+	for _, v := range values {
+		f, ok := flags.m[v.name]
+		if !ok {
+			panic(fmt.Errorf("flag %q not found", v.name))
+		}
+
+		if f.Kind != v.kind {
+			panic(fmt.Errorf("invalid value kind for flag %q", v.name))
+		}
+
+		m[v.name] = v
+	}
+
+	return context.WithValue(ctx, (*valuesMapKey)(s), m)
 }
 
 // Typed registers a new flag that represents a value of type T.

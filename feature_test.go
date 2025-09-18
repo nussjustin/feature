@@ -95,11 +95,13 @@ func TestFlagSet_Lookup(t *testing.T) {
 	assertEquals(t, false, okC, "flagC marked as ok")
 }
 
-func TestFlagSet_Context(t *testing.T) {
-	t.Run("Ignores unknown", func(t *testing.T) {
+func TestFlagSet_WithValue(t *testing.T) {
+	t.Run("Panics on unknown", func(t *testing.T) {
 		var set feature.FlagSet
 
-		set.Context(t.Context(), feature.StringValue("test", "value"))
+		assertPanicErrorString(t, `flag "test" not found`, func() {
+			set.WithValue(t.Context(), feature.StringValue("test", "value"))
+		})
 	})
 
 	t.Run("Panics on wrong type", func(t *testing.T) {
@@ -107,7 +109,26 @@ func TestFlagSet_Context(t *testing.T) {
 		set.Int("test", "test flag", 5)
 
 		assertPanicErrorString(t, `invalid value kind for flag "test"`, func() {
-			set.Context(t.Context(), feature.StringValue("test", "value"))
+			set.WithValue(t.Context(), feature.StringValue("test", "value"))
+		})
+	})
+}
+
+func TestFlagSet_WithValues(t *testing.T) {
+	t.Run("Panics on unknown", func(t *testing.T) {
+		var set feature.FlagSet
+
+		assertPanicErrorString(t, `flag "test" not found`, func() {
+			set.WithValues(t.Context(), feature.StringValue("test", "value"))
+		})
+	})
+
+	t.Run("Panics on wrong type", func(t *testing.T) {
+		var set feature.FlagSet
+		set.Int("test", "test flag", 5)
+
+		assertPanicErrorString(t, `invalid value kind for flag "test"`, func() {
+			set.WithValues(t.Context(), feature.StringValue("test", "value"))
 		})
 	})
 }
@@ -163,14 +184,9 @@ func TestFlagSet_Any(t *testing.T) {
 		v1 := set.Any("test1", "test flag", false)
 		v2 := set.Any("test2", "test flag", true)
 
-		ctx = set.Context(ctx,
+		ctx = set.WithValues(ctx,
 			feature.AnyValue("test1", true),
 			feature.AnyValue("test2", false))
-
-		var otherSet feature.FlagSet
-		ctx = otherSet.Context(ctx,
-			feature.AnyValue("test1", false),
-			feature.AnyValue("test2", true))
 
 		assertEquals(t, true, v1(ctx), "")
 		assertEquals(t, false, v2(ctx), "")
@@ -215,14 +231,9 @@ func TestFlagSet_Bool(t *testing.T) {
 		v1 := set.Bool("test1", "test flag", false)
 		v2 := set.Bool("test2", "test flag", true)
 
-		ctx = set.Context(ctx,
+		ctx = set.WithValues(ctx,
 			feature.BoolValue("test1", true),
 			feature.BoolValue("test2", false))
-
-		var otherSet feature.FlagSet
-		ctx = otherSet.Context(ctx,
-			feature.BoolValue("test1", false),
-			feature.BoolValue("test2", true))
 
 		assertEquals(t, true, v1(ctx), "")
 		assertEquals(t, false, v2(ctx), "")
@@ -270,14 +281,9 @@ func TestFlagSet_Duration(t *testing.T) {
 		v1 := set.Duration("test1", "test flag", 5*time.Second)
 		v2 := set.Duration("test2", "test flag", 10*time.Second)
 
-		ctx = set.Context(ctx,
+		ctx = set.WithValues(ctx,
 			feature.DurationValue("test1", 15*time.Second),
 			feature.DurationValue("test2", 20*time.Second))
-
-		var otherSet feature.FlagSet
-		ctx = otherSet.Context(ctx,
-			feature.DurationValue("test1", 25*time.Second),
-			feature.DurationValue("test2", 30*time.Second))
 
 		assertEquals(t, 15*time.Second, v1(ctx), "")
 		assertEquals(t, 20*time.Second, v2(ctx), "")
@@ -325,14 +331,9 @@ func TestFlagSet_Float64(t *testing.T) {
 		v1 := set.Float64("test1", "test flag", 5.0)
 		v2 := set.Float64("test2", "test flag", 10.0)
 
-		ctx = set.Context(ctx,
+		ctx = set.WithValues(ctx,
 			feature.Float64Value("test1", 15.0),
 			feature.Float64Value("test2", 20.0))
-
-		var otherSet feature.FlagSet
-		ctx = otherSet.Context(ctx,
-			feature.Float64Value("test1", 25.0),
-			feature.Float64Value("test2", 30.0))
 
 		assertEquals(t, 15.0, v1(ctx), "")
 		assertEquals(t, 20.0, v2(ctx), "")
@@ -380,14 +381,9 @@ func TestFlagSet_Int(t *testing.T) {
 		v1 := set.Int("test1", "test flag", 5)
 		v2 := set.Int("test2", "test flag", 10)
 
-		ctx = set.Context(ctx,
+		ctx = set.WithValues(ctx,
 			feature.IntValue("test1", 15),
 			feature.IntValue("test2", 20))
-
-		var otherSet feature.FlagSet
-		ctx = otherSet.Context(ctx,
-			feature.IntValue("test1", 25),
-			feature.IntValue("test2", 30))
 
 		assertEquals(t, 15, v1(ctx), "")
 		assertEquals(t, 20, v2(ctx), "")
@@ -435,14 +431,9 @@ func TestFlagSet_String(t *testing.T) {
 		v1 := set.String("test1", "test flag", "test1")
 		v2 := set.String("test2", "test flag", "test2")
 
-		ctx = set.Context(ctx,
+		ctx = set.WithValues(ctx,
 			feature.StringValue("test1", "test1 changed"),
 			feature.StringValue("test2", "test2 changed"))
-
-		var otherSet feature.FlagSet
-		ctx = otherSet.Context(ctx,
-			feature.StringValue("test1", "test1 changed again"),
-			feature.StringValue("test2", "test2 changed again"))
 
 		assertEquals(t, "test1 changed", v1(ctx), "")
 		assertEquals(t, "test2 changed", v2(ctx), "")
@@ -490,14 +481,9 @@ func TestFlagSet_Uint(t *testing.T) {
 		v1 := set.Uint("test1", "test flag", 5)
 		v2 := set.Uint("test2", "test flag", 10)
 
-		ctx = set.Context(ctx,
+		ctx = set.WithValues(ctx,
 			feature.UintValue("test1", 15),
 			feature.UintValue("test2", 20))
-
-		var otherSet feature.FlagSet
-		ctx = otherSet.Context(ctx,
-			feature.UintValue("test1", 25),
-			feature.UintValue("test2", 30))
 
 		assertEquals(t, 15, v1(ctx), "")
 		assertEquals(t, 20, v2(ctx), "")
@@ -545,7 +531,7 @@ func BenchmarkFlagSet_Any(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.Any("test", "test flag", false)
-		ctx := set.Context(b.Context(), feature.AnyValue("test", true))
+		ctx := set.WithValues(b.Context(), feature.AnyValue("test", true))
 
 		b.ReportAllocs()
 
@@ -557,7 +543,7 @@ func BenchmarkFlagSet_Any(b *testing.B) {
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.Any("test", "test flag", false)
-		ctx := set.Context(b.Context(), feature.AnyValue("unused", false))
+		ctx := set.WithValues(b.Context(), feature.AnyValue("unused", false))
 
 		b.ReportAllocs()
 
@@ -571,7 +557,7 @@ func BenchmarkFlagSet_Bool(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.Bool("test", "test flag", false)
-		ctx := set.Context(b.Context(), feature.BoolValue("test", true))
+		ctx := set.WithValue(b.Context(), feature.BoolValue("test", true))
 
 		b.ReportAllocs()
 
@@ -583,7 +569,7 @@ func BenchmarkFlagSet_Bool(b *testing.B) {
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.Bool("test", "test flag", false)
-		ctx := set.Context(b.Context(), feature.BoolValue("unused", false))
+		ctx := set.WithValues(b.Context(), feature.BoolValue("unused", false))
 
 		b.ReportAllocs()
 
@@ -597,7 +583,7 @@ func BenchmarkFlagSet_Float64(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.Float64("test", "test flag", 5.0)
-		ctx := set.Context(b.Context(), feature.Float64Value("test", 5.0))
+		ctx := set.WithValue(b.Context(), feature.Float64Value("test", 5.0))
 
 		b.ReportAllocs()
 
@@ -609,7 +595,7 @@ func BenchmarkFlagSet_Float64(b *testing.B) {
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.Float64("test", "test flag", 5.0)
-		ctx := set.Context(b.Context(), feature.Float64Value("unused", 0.0))
+		ctx := set.WithValue(b.Context(), feature.Float64Value("unused", 0.0))
 
 		b.ReportAllocs()
 
@@ -623,7 +609,7 @@ func BenchmarkFlagSet_Int(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.Int("test", "test flag", 5.0)
-		ctx := set.Context(b.Context(), feature.IntValue("test", 5))
+		ctx := set.WithValue(b.Context(), feature.IntValue("test", 5))
 
 		b.ReportAllocs()
 
@@ -635,7 +621,7 @@ func BenchmarkFlagSet_Int(b *testing.B) {
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.Int("test", "test flag", 5.0)
-		ctx := set.Context(b.Context(), feature.IntValue("unused", 0))
+		ctx := set.WithValue(b.Context(), feature.IntValue("unused", 0))
 
 		b.ReportAllocs()
 
@@ -649,7 +635,7 @@ func BenchmarkFlagSet_String(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.String("test", "test flag", "test")
-		ctx := set.Context(b.Context(), feature.StringValue("test", "test"))
+		ctx := set.WithValue(b.Context(), feature.StringValue("test", "test"))
 
 		b.ReportAllocs()
 
@@ -661,7 +647,7 @@ func BenchmarkFlagSet_String(b *testing.B) {
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.String("test", "test flag", "test")
-		ctx := set.Context(b.Context(), feature.StringValue("unused", ""))
+		ctx := set.WithValue(b.Context(), feature.StringValue("unused", ""))
 
 		b.ReportAllocs()
 
@@ -675,7 +661,7 @@ func BenchmarkFlagSet_Uint(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.Uint("test", "test flag", 5)
-		ctx := set.Context(b.Context(), feature.UintValue("test", 5))
+		ctx := set.WithValue(b.Context(), feature.UintValue("test", 5))
 
 		b.ReportAllocs()
 
@@ -687,7 +673,7 @@ func BenchmarkFlagSet_Uint(b *testing.B) {
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := set.Uint("test", "test flag", 5)
-		ctx := set.Context(b.Context(), feature.UintValue("unused", 0))
+		ctx := set.WithValue(b.Context(), feature.UintValue("unused", 0))
 
 		b.ReportAllocs()
 
@@ -701,7 +687,7 @@ func BenchmarkTyped(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := feature.Typed(&set, "test", "test flag", testStruct{value: 5})
-		ctx := set.Context(b.Context(), feature.AnyValue("test", testStruct{value: 5}))
+		ctx := set.WithValue(b.Context(), feature.AnyValue("test", testStruct{value: 5}))
 
 		b.ReportAllocs()
 
@@ -713,7 +699,7 @@ func BenchmarkTyped(b *testing.B) {
 	b.Run("Default", func(b *testing.B) {
 		var set feature.FlagSet
 		flag := feature.Typed(&set, "test", "test flag", testStruct{value: 5})
-		ctx := set.Context(b.Context(), feature.AnyValue("unused", 0))
+		ctx := set.WithValue(b.Context(), feature.AnyValue("unused", 0))
 
 		b.ReportAllocs()
 
