@@ -61,7 +61,7 @@ import (
 func main() {
 	var set feature.FlagSet
 
-	myFeature := set.BoolFunc("my-feature", "some new feature", func(ctx context.Context, name string) bool {
+	myFeature := set.BoolFunc("my-feature", "some new feature", func(ctx context.Context) bool {
 		// ... do something with ctx ...
 		return false
 	})
