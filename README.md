@@ -22,9 +22,6 @@ Currently, the supported methods are
 
 Each method will return a callback that takes a `context.Context` and returns a value of the specific type.
 
-There is also [feature.Typed][16] and [feature.TypedFunc][17] which can be used to register flags using an
-arbitrary, generic type. Note that you can not currently override typed values for a context in a safe way.
-
 For example:
 
 ```go
@@ -129,5 +126,3 @@ Please make sure to update tests as appropriate.
 [13]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.UintFunc
 [14]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.Any
 [15]: https://pkg.go.dev/github.com/nussjustin/feature/#FlagSet.AnyFunc
-[16]: https://pkg.go.dev/github.com/nussjustin/feature/#Typed
-[17]: https://pkg.go.dev/github.com/nussjustin/feature/#TypedFunc

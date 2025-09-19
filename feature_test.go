@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/nussjustin/feature"
 )
@@ -219,9 +218,7 @@ func TestFlagSet_Bool(t *testing.T) {
 		ctx := t.Context()
 
 		var set feature.FlagSet
-		v := set.BoolFunc("test", "test flag", func(ctx context.Context) bool {
-			return hasTestFlag(ctx)
-		})
+		v := set.BoolFunc("test", "test flag", hasTestFlag)
 
 		assertEquals(t, false, v(ctx), "")
 		assertEquals(t, true, v(withTestFlag(ctx)), "")
@@ -493,43 +490,6 @@ func TestFlagSet_Uint(t *testing.T) {
 	})
 }
 
-type testStruct struct{ value int }
-
-func TestTyped(t *testing.T) {
-	t.Run("Duplicate", func(t *testing.T) {
-		var set feature.FlagSet
-		set.Float64("test", "test flag", 0.0)
-
-		assertPanic(t, feature.ErrDuplicateFlag, func() {
-			feature.Typed(&set, "test", "test flag", testStruct{})
-		})
-	})
-
-	t.Run("Default", func(t *testing.T) {
-		ctx := t.Context()
-
-		var set feature.FlagSet
-		v := feature.Typed(&set, "test", "test flag", testStruct{value: 5})
-
-		assertEquals(t, testStruct{value: 5}, v(ctx), "")
-	})
-
-	t.Run("Func", func(t *testing.T) {
-		ctx := t.Context()
-
-		var set feature.FlagSet
-		v := feature.TypedFunc(&set, "test", "test flag", func(ctx context.Context) testStruct {
-			if hasTestFlag(ctx) {
-				return testStruct{value: 5}
-			}
-			return testStruct{}
-		})
-
-		assertEquals(t, testStruct{}, v(ctx), "")
-		assertEquals(t, testStruct{value: 5}, v(withTestFlag(ctx)), "")
-	})
-}
-
 func BenchmarkFlagSet_Any(b *testing.B) {
 	b.Run("Context", func(b *testing.B) {
 		var set feature.FlagSet
@@ -692,33 +652,6 @@ func BenchmarkFlagSet_Uint(b *testing.B) {
 	})
 }
 
-func BenchmarkTyped(b *testing.B) {
-	b.Run("Context", func(b *testing.B) {
-		var set feature.FlagSet
-		flag := feature.Typed(&set, "test", "test flag", testStruct{value: 5})
-		ctx := set.WithValue(b.Context(), feature.AnyValue("test", testStruct{value: 5}))
-
-		b.ReportAllocs()
-
-		for b.Loop() {
-			flag(ctx)
-		}
-	})
-
-	b.Run("Default", func(b *testing.B) {
-		ctx := b.Context()
-
-		var set feature.FlagSet
-		flag := feature.Typed(&set, "test", "test flag", testStruct{value: 5})
-
-		b.ReportAllocs()
-
-		for b.Loop() {
-			flag(ctx)
-		}
-	})
-}
-
 func assertEquals[T any](tb testing.TB, want, got T, msg string) {
 	tb.Helper()
 
@@ -730,7 +663,7 @@ func assertEquals[T any](tb testing.TB, want, got T, msg string) {
 		return x.Name == y.Name && x.Description == y.Description
 	})
 
-	if diff := cmp.Diff(want, got, flagComparer, cmpopts.EquateComparable(testStruct{})); diff != "" {
+	if diff := cmp.Diff(want, got, flagComparer); diff != "" {
 		tb.Errorf("%s (-want +got):\n%s", msg, diff)
 	}
 }
